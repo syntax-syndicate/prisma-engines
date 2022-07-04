@@ -1,4 +1,4 @@
-use crate::{error::ApiError, logger::Logger};
+use crate::{error::ApiError, log_callback::LogCallback, logger::Logger};
 use datamodel::{common::preview_features::PreviewFeature, dml::Datamodel, ValidatedConfiguration};
 use futures::FutureExt;
 use prisma_models::InternalDataModelBuilder;
@@ -22,7 +22,7 @@ use tracing::instrument::WithSubscriber;
 use tracing_subscriber::filter::LevelFilter;
 use user_facing_errors::Error;
 
-use napi::{threadsafe_function::ThreadSafeCallContext, Env, JsFunction, JsUnknown};
+use napi::{Env, JsFunction, JsUnknown};
 use napi_derive::napi;
 
 /// The main query engine used by JS
@@ -134,14 +134,7 @@ struct ConstructorOptions {
 
 impl ValidEngine {
     pub fn new(env: Env, options: JsUnknown, callback: JsFunction) -> napi::Result<Self> {
-        let mut log_callback = callback.create_threadsafe_function(0, |mut ctx: ThreadSafeCallContext<String>| {
-            ctx.env.adjust_external_memory(ctx.value.len() as i64)?;
-
-            ctx.env
-                .create_string_from_std(ctx.value)
-                .map(|js_string| vec![js_string])
-        })?;
-
+        let log_callback = LogCallback::new(env, callback)?;
         log_callback.unref(&env)?;
 
         let ConstructorOptions {

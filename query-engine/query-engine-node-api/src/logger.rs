@@ -1,5 +1,4 @@
 use core::fmt;
-use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use query_core::MetricRegistry;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -15,6 +14,8 @@ use tracing_subscriber::{
     Layer, Registry,
 };
 
+use crate::log_callback::LogCallback;
+
 pub(crate) struct Logger {
     dispatcher: Dispatch,
     metrics: Option<MetricRegistry>,
@@ -22,12 +23,7 @@ pub(crate) struct Logger {
 
 impl Logger {
     /// Creates a new logger using a call layer
-    pub fn new(
-        log_queries: bool,
-        log_level: LevelFilter,
-        log_callback: ThreadsafeFunction<String>,
-        enable_metrics: bool,
-    ) -> Self {
+    pub fn new(log_queries: bool, log_level: LevelFilter, log_callback: LogCallback, enable_metrics: bool) -> Self {
         let is_sql_query = filter_fn(|meta| {
             meta.target() == "quaint::connector::metrics" && meta.fields().iter().any(|f| f.name() == "query")
         });
@@ -120,13 +116,12 @@ impl<'a> ToString for JsonVisitor<'a> {
     }
 }
 
-#[derive(Clone)]
-pub struct CallbackLayer {
-    callback: ThreadsafeFunction<String>,
+pub(crate) struct CallbackLayer {
+    callback: LogCallback,
 }
 
 impl CallbackLayer {
-    pub fn new(callback: ThreadsafeFunction<String>) -> Self {
+    pub fn new(callback: LogCallback) -> Self {
         CallbackLayer { callback }
     }
 }
@@ -137,19 +132,6 @@ impl<S: Subscriber> Layer<S> for CallbackLayer {
         let mut visitor = JsonVisitor::new(event.metadata().level(), event.metadata().target());
         event.record(&mut visitor);
 
-        let result = visitor.to_string();
-
-        self.callback.call(Ok(result), ThreadsafeFunctionCallMode::Blocking);
-    }
-}
-
-impl Drop for CallbackLayer {
-    fn drop(&mut self) {
-        unsafe {
-            napi::sys::napi_release_threadsafe_function(
-                self.callback.raw(),
-                napi::sys::ThreadsafeFunctionReleaseMode::abort,
-            );
-        }
+        let _ = self.callback.call(visitor.to_string());
     }
 }
