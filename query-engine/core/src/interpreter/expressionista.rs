@@ -22,7 +22,7 @@ impl Expressionista {
             .into_iter()
             .map(|root_node| Self::build_expression(&mut graph, &root_node, vec![]))
             .collect::<InterpretationResult<Vec<Expression>>>()
-            .map(|res| Expression::Sequence { seq: res })
+            .map(|seq| Expression::Sequence { seq })
     }
 
     fn build_expression(
@@ -50,7 +50,6 @@ impl Expressionista {
 
         // Child edges are ordered, evaluation order is low to high in the graph, unless other rules override.
         let direct_children = graph.direct_child_pairs(&node);
-
         let mut child_expressions = Self::process_children(graph, direct_children)?;
 
         let is_result = graph.is_result_node(&node);
@@ -139,6 +138,7 @@ impl Expressionista {
         graph.mark_visited(node);
 
         let child_pairs = graph.direct_child_pairs(node);
+
         let exprs: Vec<Expression> = child_pairs
             .into_iter()
             .map(|(_, node)| Self::build_expression(graph, &node, graph.incoming_edges(&node)))

@@ -105,16 +105,7 @@ impl Model {
 
 impl Debug for Model {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Model")
-            .field("name", &self.name)
-            .field("schema", &self.schema_name().unwrap_or_default())
-            .field("manifestation", &self.manifestation)
-            .field("fields", &self.fields)
-            .field("indexes", &self.indexes)
-            .field("primary_identifier", &self.primary_identifier)
-            .field("dml_model", &self.dml_model)
-            .field("internal_data_model", &"#InternalDataModelWeakRef#")
-            .finish()
+        f.debug_struct("Model").field("name", &self.name).finish()
     }
 }
 

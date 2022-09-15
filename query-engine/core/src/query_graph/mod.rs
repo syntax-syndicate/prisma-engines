@@ -26,9 +26,12 @@ pub enum Node {
     /// Flow control nodes.
     Flow(Flow),
 
-    // Todo this strongly indicates that the query graph has to change, probably towards a true AST for the interpretation,
-    // instead of this unsatisfying in-between of high-level abstraction over the incoming query and concrete interpreter actions.
-    /// A general computation to perform. As opposed to `Query`, this doesn't invoke the connector.
+    // Todo this strongly indicates that the query graph has to
+    // change, probably towards a true AST for the interpretation,
+    // instead of this unsatisfying in-between of high-level
+    // abstraction over the incoming query and concrete interpreter
+    // actions. / A general computation to perform. As opposed to
+    // `Query`, this doesn't invoke the connector.
     Computation(Computation),
 
     /// Empty node.
@@ -215,12 +218,31 @@ impl QueryGraph {
         Ok(graph)
     }
 
+    pub fn is_create(&self) -> bool {
+        self.root_nodes()
+            .first()
+            .and_then(|node| self.node_content(node))
+            .map(|node| match node {
+                Node::Query(q) => match q {
+                    Query::Write(w) => match w {
+                        crate::WriteQuery::CreateRecord(_) => true,
+                        crate::WriteQuery::CreateManyRecords(_) => true,
+                        _ => false,
+                    },
+                    _ => false,
+                },
+                _ => false,
+            })
+            .unwrap_or(false)
+    }
+
     pub fn finalize(&mut self) -> QueryGraphResult<()> {
         if !self.finalized {
             self.swap_marked()?;
             self.ensure_return_nodes_have_parent_dependency()?;
             self.insert_reloads()?;
             self.normalize_if_nodes()?;
+
             self.finalized = true;
         }
 
@@ -434,7 +456,8 @@ impl QueryGraph {
             .collect()
     }
 
-    /// Internal utility function to collect all edges of defined direction directed to, or originating from, `node`.
+    /// Internal utility function to collect all edges of defined
+    /// direction directed to, or originating from, `node`.
     fn collect_edges(&self, node: &NodeRef, direction: Direction) -> Vec<EdgeRef> {
         let mut edges = self
             .graph
@@ -443,6 +466,7 @@ impl QueryGraph {
             .collect::<Vec<_>>();
 
         edges.sort();
+
         edges
     }
 

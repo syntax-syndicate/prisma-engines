@@ -104,7 +104,7 @@ mod prisma_14447 {
     }
 
     #[connector_test]
-    async fn prisma_14447_double_nesting(runner: Runner) -> TestResult<()> {
+    async fn double_nesting(runner: Runner) -> TestResult<()> {
         let query = indoc! {r#"
             mutation {
               createOneGroup(data: {
