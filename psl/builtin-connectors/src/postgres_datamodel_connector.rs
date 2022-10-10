@@ -134,6 +134,7 @@ const SCALAR_TYPE_DEFAULTS: &[(ScalarType, PostgresType)] = &[
 ];
 
 /// Postgres-specific properties in the datasource block.
+#[derive(Default, Debug)]
 pub struct PostgresDatasourceProperties {
     extensions: Option<PostgresExtensions>,
 }
@@ -142,6 +143,13 @@ impl PostgresDatasourceProperties {
     /// Database extensions.
     pub fn extensions(&self) -> Option<&PostgresExtensions> {
         self.extensions.as_ref()
+    }
+
+    pub fn set_extensions(&mut self, extensions: Vec<PostgresExtension>) {
+        self.extensions = Some(PostgresExtensions {
+            extensions,
+            span: ast::Span::empty(),
+        });
     }
 }
 
@@ -153,6 +161,7 @@ impl PostgresDatasourceProperties {
 ///   //            ^^^^^^^
 /// }
 /// ```
+#[derive(Debug, Clone)]
 pub struct PostgresExtension {
     name: String,
     span: ast::Span,
@@ -162,6 +171,32 @@ pub struct PostgresExtension {
 }
 
 impl PostgresExtension {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            span: ast::Span::empty(),
+            schema: None,
+            version: None,
+            db_name: None,
+        }
+    }
+
+    pub fn set_span(&mut self, span: ast::Span) {
+        self.span = span;
+    }
+
+    pub fn set_schema(&mut self, schema: String) {
+        self.schema = Some(schema);
+    }
+
+    pub fn set_version(&mut self, version: String) {
+        self.version = Some(version);
+    }
+
+    pub fn set_db_name(&mut self, db_name: String) {
+        self.db_name = Some(db_name);
+    }
+
     /// The name of the extension in the datasource.
     ///
     /// ```ignore
@@ -217,9 +252,19 @@ impl PostgresExtension {
 ///   //           ^^^^^^^^^^^^^^^^^
 /// }
 /// ```
+#[derive(Debug, Clone)]
 pub struct PostgresExtensions {
     pub(crate) extensions: Vec<PostgresExtension>,
     pub(crate) span: ast::Span,
+}
+
+impl Default for PostgresExtensions {
+    fn default() -> Self {
+        Self {
+            extensions: Vec::new(),
+            span: ast::Span::empty(),
+        }
+    }
 }
 
 impl PostgresExtensions {
@@ -231,6 +276,13 @@ impl PostgresExtensions {
     /// The extension definitions.
     pub fn extensions(&self) -> &[PostgresExtension] {
         &self.extensions
+    }
+
+    /// Finds the extension with the given database name.
+    pub fn find_by_name(&self, name: &str) -> Option<&PostgresExtension> {
+        self.extensions()
+            .iter()
+            .find(|ext| ext.db_name() == Some(name) || ext.name() == name)
     }
 }
 
@@ -586,8 +638,8 @@ impl Connector for PostgresDatamodelConnector {
         };
 
         let extensions = match properties.extensions() {
-            Some(extensions) => extensions.extensions(),
-            None => return Ok(()),
+            Some(extensions) if !extensions.extensions().is_empty() => extensions.extensions(),
+            _ => return Ok(()),
         };
 
         out.push_str("extensions = [");
