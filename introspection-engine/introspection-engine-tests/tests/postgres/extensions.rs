@@ -19,7 +19,7 @@ async fn should_work_with_the_preview_feature_enabled(api: &TestApi) -> TestResu
         datasource db {
           provider   = "postgresql"
           url        = "env(TEST_DATABASE_URL)"
-          extensions = [citext]
+          extensions = [citext(schema: "prisma-tests")]
         }
     "#]];
 
@@ -45,7 +45,7 @@ async fn sanitizes_problematic_extension_names(api: &TestApi) -> TestResult {
         datasource db {
           provider   = "postgresql"
           url        = "env(TEST_DATABASE_URL)"
-          extensions = [uuid_ossp(map: "uuid-ossp")]
+          extensions = [uuid_ossp(map: "uuid-ossp", schema: "prisma-tests")]
         }
     "#]];
 

@@ -64,6 +64,7 @@ pub(super) fn calculate_configuration(previous_config: &Configuration, schema: &
                 extensions.push(next);
             }
             None if EXTENSION_ALLOW_LIST.contains(&ext.name.as_str()) => {
+                next.set_schema(ext.schema.clone());
                 extensions.push(next);
             }
             None => (),
