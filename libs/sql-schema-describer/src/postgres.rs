@@ -52,6 +52,13 @@ impl Default for Sequence {
     }
 }
 
+#[derive(Debug)]
+pub struct DatabaseExtension {
+    pub name: String,
+    pub schema: String,
+    pub version: String,
+}
+
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum SqlIndexAlgorithm {
     BTree,
@@ -114,6 +121,8 @@ pub struct PostgresSchemaExt {
     pub indexes: Vec<(IndexId, SqlIndexAlgorithm)>,
     /// The schema's sequences.
     pub sequences: Vec<Sequence>,
+    /// The extensions included in the schema(s).
+    pub extensions: Vec<DatabaseExtension>,
 }
 
 impl PostgresSchemaExt {
@@ -426,6 +435,8 @@ impl<'a> super::SqlSchemaDescriberBackend for SqlSchemaDescriber<'a> {
         sql_schema.enums = self.get_enums(schema).await?;
         self.get_columns(schema, &table_names, &mut sql_schema).await?;
         self.get_foreign_keys(schema, &table_names, &mut sql_schema).await?;
+        self.get_extensions(schema, &mut pg_ext).await?;
+
         self.get_indices(schema, &table_names, &mut pg_ext, &mut sql_schema)
             .await?;
 
@@ -455,6 +466,38 @@ impl<'a> SqlSchemaDescriber<'a> {
 
     fn is_cockroach(&self) -> bool {
         self.circumstances.contains(Circumstances::Cockroach)
+    }
+
+    async fn get_extensions(&self, schema: &str, pg_ext: &mut PostgresSchemaExt) -> DescriberResult<()> {
+        // CockroachDB does not support extensions.
+        if self.is_cockroach() {
+            return Ok(());
+        }
+
+        let sql = indoc! {r#"
+            SELECT
+                ext.extname AS extension_name,
+                ext.extversion AS extension_version,
+                pn.nspname AS extension_schema
+            FROM pg_extension ext
+            INNER JOIN pg_namespace pn ON ext.extnamespace = pn.oid
+            WHERE pn.nspname = $1;
+        "#};
+
+        let rows = self.conn.query_raw(sql, &[schema.into()]).await?;
+        let mut extensions = Vec::with_capacity(rows.len());
+
+        for row in rows.into_iter() {
+            extensions.push(DatabaseExtension {
+                name: row.get_expect_string("extension_name"),
+                schema: row.get_expect_string("extension_schema"),
+                version: row.get_expect_string("extension_version"),
+            });
+        }
+
+        pg_ext.extensions = extensions;
+
+        Ok(())
     }
 
     async fn get_databases(&self) -> DescriberResult<Vec<String>> {
