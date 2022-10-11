@@ -299,16 +299,9 @@ pub trait Connector: Send + Sync {
 
     fn parse_datasource_properties(
         &self,
-        args: &mut HashMap<&str, (Span, &ast::Expression)>,
-        diagnostics: &mut Diagnostics,
+        _args: &mut HashMap<&str, (Span, &ast::Expression)>,
+        _diagnostics: &mut Diagnostics,
     ) -> DatasourceConnectorData {
-        if let Some((span, _)) = args.remove(EXTENSIONS_KEY) {
-            diagnostics.push_error(DatamodelError::new_static(
-                "The `extensions` property is only available with the `postgresql` connector.",
-                span,
-            ));
-        }
-
         Default::default()
     }
 

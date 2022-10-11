@@ -8,7 +8,7 @@ datasource db {
   url        = env("TEST_DATABASE_URL")
   extensions = [postgis]
 }
-// [1;91merror[0m: [1mThe `extensions` property is only available with the `postgresql` connector.[0m
+// [1;91merror[0m: [1mProperty not known: "extensions".[0m
 //   [1;94m-->[0m  [4mschema.prisma:9[0m
 // [1;94m   | [0m
 // [1;94m 8 | [0m  url        = env("TEST_DATABASE_URL")

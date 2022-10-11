@@ -14,25 +14,6 @@ macro_rules! impl_coercions {
                 coerce::<$lt>(super::coerce_opt::$name, $expected_type)(expr, diagnostics)
             }
             )*
-
-            pub fn function_or_constant_with_span<'a>(
-                expr: &'a ast::Expression,
-                diagnostics: &mut Diagnostics,
-            ) -> Option<(&'a str, &'a [ast::Argument], ast::Span)> {
-                match super::coerce_opt::function_or_constant_with_span(expr) {
-                    Some(val) => Some(val),
-                    None => {
-                        diagnostics.push_error(DatamodelError::new_type_mismatch_error(
-                            "constant or function",
-                            expr.describe_value_type(),
-                            &expr.to_string(),
-                            expr.span(),
-                        ));
-
-                        None
-                    }
-                }
-            }
         }
     }
 }
@@ -48,6 +29,7 @@ impl_coercions! {
     float : "float" => f64;
     function : "function" => (&'a str, &'a [ast::Argument]);
     function_with_span : "function" => (&'a str, &'a [ast::Argument], ast::Span);
+    function_or_constant_with_span : "constant or function" => (&'a str, &'a [ast::Argument], ast::Span);
 }
 
 /// Fallible coercions of PSL expressions to more specific types.
