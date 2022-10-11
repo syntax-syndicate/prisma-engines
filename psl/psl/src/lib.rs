@@ -14,6 +14,7 @@ pub use psl_core::{
     reformat,
     Configuration,
     Datasource,
+    DatasourceConnectorData,
     Generator,
     StringFromEnvVar,
     ValidatedSchema,
