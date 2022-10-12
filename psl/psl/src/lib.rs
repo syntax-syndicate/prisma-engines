@@ -18,6 +18,7 @@ pub use psl_core::{
     Generator,
     StringFromEnvVar,
     ValidatedSchema,
+    schema_ast,
 };
 
 /// The implementation of the CLI getConfig() utility and its JSON format.

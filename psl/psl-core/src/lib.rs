@@ -19,6 +19,7 @@ pub use crate::{
 };
 pub use diagnostics;
 pub use parser_database::{self, is_reserved_type_name};
+pub use schema_ast;
 
 use self::{
     common::preview_features::PreviewFeature,

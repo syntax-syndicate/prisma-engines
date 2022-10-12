@@ -8,28 +8,7 @@ pub struct Text<'a>(pub &'a str);
 
 impl<'a> fmt::Display for Text<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("\"")?;
-
-        for c in self.0.char_indices() {
-            match c {
-                (_, '\t') => f.write_str("\\t")?,
-                (_, '\n') => f.write_str("\\n")?,
-                (_, '"') => f.write_str("\\\"")?,
-                (_, '\r') => f.write_str("\\r")?,
-                (_, '\\') => f.write_str("\\\\")?,
-                // Control characters
-                (_, c) if c.is_ascii_control() => {
-                    let mut b = [0];
-                    c.encode_utf8(&mut b);
-                    f.write_fmt(format_args!("\\u{:04x}", b[0]))?;
-                }
-                (start, other) => f.write_str(&self.0[start..(start + other.len_utf8())])?,
-            }
-        }
-
-        f.write_str("\"")?;
-
-        Ok(())
+        fmt::Display::fmt(&psl::schema_ast::string_literal(self.0), f)
     }
 }
 
