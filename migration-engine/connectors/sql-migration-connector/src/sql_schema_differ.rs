@@ -409,10 +409,10 @@ fn push_redefined_table_steps(steps: &mut Vec<SqlMigrationStep>, db: &DifferData
         return;
     }
 
-    let tables_to_redefine = db
+    db
         .table_pairs()
         .filter(|tables| db.tables_to_redefine.contains(&tables.table_ids()))
-        .map(|differ| {
+        .for_each(|differ| {
             let column_pairs = differ
                 .column_pairs()
                 .map(|columns| {
@@ -429,23 +429,22 @@ fn push_redefined_table_steps(steps: &mut Vec<SqlMigrationStep>, db: &DifferData
                 })
                 .collect();
 
-            RedefineTable {
-                table_ids: differ.tables.map(|t| t.id),
-                dropped_primary_key: dropped_primary_key(&differ).is_some(),
-                added_columns: differ.added_columns().map(|col| col.id).collect(),
-                added_columns_with_virtual_defaults: differ
-                    .added_columns()
-                    .filter(|col| next_column_has_virtual_default(col.id, differ.db))
-                    .map(|col| col.id)
-                    .collect(),
-                dropped_columns: differ.dropped_columns().map(|col| col.id).collect(),
-                column_pairs,
-            }
-        })
-        .collect();
-
-    // TODO PR: None?
-    steps.push(SqlMigrationStep::new(None, SqlMigrationStepKind::RedefineTables(tables_to_redefine)))
+            steps.push(SqlMigrationStep::new(
+                None,
+                SqlMigrationStepKind::RedefineTable(RedefineTable {
+                    table_ids: differ.tables.map(|t| t.id),
+                    dropped_primary_key: dropped_primary_key(&differ).is_some(),
+                    added_columns: differ.added_columns().map(|col| col.id).collect(),
+                    added_columns_with_virtual_defaults: differ
+                        .added_columns()
+                        .filter(|col| next_column_has_virtual_default(col.id, differ.db))
+                        .map(|col| col.id)
+                        .collect(),
+                    dropped_columns: differ.dropped_columns().map(|col| col.id).collect(),
+                    column_pairs,
+                }),
+            ))
+        });
 }
 
 /// Compare two foreign keys and return whether they should be considered

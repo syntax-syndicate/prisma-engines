@@ -84,7 +84,7 @@ pub(crate) trait SqlRenderer {
     }
 
     /// Render a `RedefineTables` step.
-    fn render_redefine_tables(&self, tables: &[RedefineTable], schemas: Pair<&SqlSchema>) -> Vec<String>;
+    fn render_redefine_table(&self, table: &RedefineTable, schemas: Pair<&SqlSchema>) -> Vec<String>;
 
     /// Render a table renaming step.
     fn render_rename_table(&self, name: &str, new_name: &str) -> String;

@@ -254,38 +254,37 @@ impl SqlRenderer for MssqlFlavour {
         }
     }
 
-    fn render_redefine_tables(&self, tables: &[RedefineTable], schemas: Pair<&sql::SqlSchema>) -> Vec<String> {
+    fn render_redefine_table(&self, redefine_table: &RedefineTable, schemas: Pair<&sql::SqlSchema>) -> Vec<String> {
         // All needs to be inside a transaction.
         let mut result = vec!["BEGIN TRANSACTION".to_string()];
 
-        for redefine_table in tables {
-            let tables = schemas.walk(redefine_table.table_ids);
-            // This is a copy of our new modified table.
-            let temporary_table_name = format!("_prisma_new_{}", &tables.next.name());
+        let tables = schemas.walk(redefine_table.table_ids);
+        // This is a copy of our new modified table.
+        let temporary_table_name = format!("_prisma_new_{}", &tables.next.name());
 
-            // If any of the columns is an identity, we should know about it.
-            let needs_autoincrement = redefine_table
-                .column_pairs
-                .iter()
-                .any(|(column_indexes, _, _)| schemas.walk(*column_indexes).next.is_autoincrement());
+        // If any of the columns is an identity, we should know about it.
+        let needs_autoincrement = redefine_table
+            .column_pairs
+            .iter()
+            .any(|(column_indexes, _, _)| schemas.walk(*column_indexes).next.is_autoincrement());
 
-            // Let's make the [columns] nicely rendered.
-            let columns: Vec<_> = redefine_table
-                .column_pairs
-                .iter()
-                .map(|(column_indexes, _, _)| schemas.walk(*column_indexes).next.name())
-                .map(|c| Quoted::mssql_ident(c).to_string())
-                .collect();
+        // Let's make the [columns] nicely rendered.
+        let columns: Vec<_> = redefine_table
+            .column_pairs
+            .iter()
+            .map(|(column_indexes, _, _)| schemas.walk(*column_indexes).next.name())
+            .map(|c| Quoted::mssql_ident(c).to_string())
+            .collect();
 
-            // Drop the indexes on the table.
-            for index in tables.previous.indexes().filter(|idx| !idx.is_primary_key()) {
-                result.push(self.render_drop_index(index));
-            }
+        // Drop the indexes on the table.
+        for index in tables.previous.indexes().filter(|idx| !idx.is_primary_key()) {
+            result.push(self.render_drop_index(index));
+        }
 
-            // Remove all constraints from our original table. This will allow
-            // us to reuse the same constraint names when creating the temporary
-            // table.
-            result.push(formatdoc! {r#"
+        // Remove all constraints from our original table. This will allow
+        // us to reuse the same constraint names when creating the temporary
+        // table.
+        result.push(formatdoc! {r#"
                 DECLARE @SQL NVARCHAR(MAX) = N''
                 SELECT @SQL += N'ALTER TABLE '
                     + QUOTENAME(OBJECT_SCHEMA_NAME(PARENT_OBJECT_ID))
@@ -300,21 +299,21 @@ impl SqlRenderer for MssqlFlavour {
                 EXEC sp_executesql @SQL
             "#, table = tables.previous.name(), schema = self.schema_name()});
 
-            // Create the new table.
-            result.push(self.render_create_table_as(tables.next, self.quote_with_schema(&temporary_table_name)));
+        // Create the new table.
+        result.push(self.render_create_table_as(tables.next, self.quote_with_schema(&temporary_table_name)));
 
-            // We cannot insert into autoincrement columns by default. If we
-            // have `IDENTITY` in any of the columns, we'll allow inserting
-            // momentarily.
-            if needs_autoincrement {
-                result.push(format!(
-                    r#"SET IDENTITY_INSERT {} ON"#,
-                    self.quote_with_schema(&temporary_table_name)
-                ));
-            }
+        // We cannot insert into autoincrement columns by default. If we
+        // have `IDENTITY` in any of the columns, we'll allow inserting
+        // momentarily.
+        if needs_autoincrement {
+            result.push(format!(
+                r#"SET IDENTITY_INSERT {} ON"#,
+                self.quote_with_schema(&temporary_table_name)
+            ));
+        }
 
-            // Now we copy everything from the old table to the newly created.
-            result.push(formatdoc! {r#"
+        // Now we copy everything from the old table to the newly created.
+        result.push(formatdoc! {r#"
                 IF EXISTS(SELECT * FROM {table})
                     EXEC('INSERT INTO {tmp_table} ({columns}) SELECT {columns} FROM {table} WITH (holdlock tablockx)')"#,
                                     columns = columns.join(","),
@@ -322,24 +321,23 @@ impl SqlRenderer for MssqlFlavour {
                                     tmp_table = self.quote_with_schema(&temporary_table_name),
             });
 
-            // When done copying, disallow identity inserts again if needed.
-            if needs_autoincrement {
-                result.push(format!(
-                    r#"SET IDENTITY_INSERT {} OFF"#,
-                    self.quote_with_schema(&temporary_table_name)
-                ));
-            }
+        // When done copying, disallow identity inserts again if needed.
+        if needs_autoincrement {
+            result.push(format!(
+                r#"SET IDENTITY_INSERT {} OFF"#,
+                self.quote_with_schema(&temporary_table_name)
+            ));
+        }
 
-            // Drop the old, now empty table.
-            result.extend(self.render_drop_table(tables.previous.name()));
+        // Drop the old, now empty table.
+        result.extend(self.render_drop_table(tables.previous.name()));
 
-            // Rename the temporary table with the name defined in the migration.
-            result.push(self.render_rename_table(&temporary_table_name, tables.next.name()));
+        // Rename the temporary table with the name defined in the migration.
+        result.push(self.render_rename_table(&temporary_table_name, tables.next.name()));
 
-            // Recreate the indexes.
-            for index in tables.next.indexes().filter(|i| !i.is_unique() && !i.is_primary_key()) {
-                result.push(self.render_create_index(index));
-            }
+        // Recreate the indexes.
+        for index in tables.next.indexes().filter(|i| !i.is_unique() && !i.is_primary_key()) {
+            result.push(self.render_create_index(index));
         }
 
         result.push("COMMIT".to_string());

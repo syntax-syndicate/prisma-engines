@@ -24,7 +24,7 @@ mod warning_check;
 pub(crate) use destructive_change_checker_flavour::DestructiveChangeCheckerFlavour;
 
 use crate::{
-    sql_migration::{AlterEnum, AlterTable, ColumnTypeChange, TableChange, SqlMigrationStepKind},
+    sql_migration::{AlterEnum, AlterTable, ColumnTypeChange, SqlMigrationStepKind, TableChange},
     SqlMigration, SqlMigrationConnector,
 };
 use destructive_check_plan::DestructiveCheckPlan;
@@ -144,88 +144,86 @@ impl SqlMigrationConnector {
                         }
                     }
                 }
-                SqlMigrationStepKind::RedefineTables(redefine_tables) => {
-                    for redefine_table in redefine_tables {
-                        let tables = schemas.walk(redefine_table.table_ids);
+                SqlMigrationStepKind::RedefineTable(redefine_table) => {
+                    let tables = schemas.walk(redefine_table.table_ids);
 
-                        if redefine_table.dropped_primary_key {
-                            plan.push_warning(
-                                SqlMigrationWarningCheck::PrimaryKeyChange {
-                                    table: tables.previous.name().to_owned(),
+                    if redefine_table.dropped_primary_key {
+                        plan.push_warning(
+                            SqlMigrationWarningCheck::PrimaryKeyChange {
+                                table: tables.previous.name().to_owned(),
+                            },
+                            step_index,
+                        )
+                    }
+
+                    for added_column_idx in &redefine_table.added_columns {
+                        let column = schemas.next.walk(*added_column_idx);
+                        let has_virtual_default = redefine_table
+                            .added_columns_with_virtual_defaults
+                            .contains(added_column_idx);
+                        self.check_add_column(&column, has_virtual_default, &mut plan, step_index);
+                    }
+
+                    for dropped_column_idx in &redefine_table.dropped_columns {
+                        let column = schemas.previous.walk(*dropped_column_idx);
+                        self.check_column_drop(&column, &mut plan, step_index);
+                    }
+
+                    for (column_ides, changes, type_change) in redefine_table.column_pairs.iter() {
+                        let columns = schemas.walk(*column_ides);
+
+                        let arity_change_is_safe = match (&columns.previous.arity(), &columns.next.arity()) {
+                            // column became required
+                            (ColumnArity::Nullable, ColumnArity::Required) => false,
+                            // column became nullable
+                            (ColumnArity::Required, ColumnArity::Nullable) => true,
+                            // nothing changed
+                            (ColumnArity::Required, ColumnArity::Required)
+                            | (ColumnArity::Nullable, ColumnArity::Nullable)
+                            | (ColumnArity::List, ColumnArity::List) => true,
+                            // not supported on SQLite
+                            (ColumnArity::List, _) | (_, ColumnArity::List) => unreachable!(),
+                        };
+
+                        if !changes.type_changed() && arity_change_is_safe {
+                            continue;
+                        }
+
+                        if changes.arity_changed()
+                            && columns.next.arity().is_required()
+                            && columns.next.default().is_none()
+                        {
+                            plan.push_unexecutable(
+                                UnexecutableStepCheck::MadeOptionalFieldRequired {
+                                    table: columns.previous.table().name().to_owned(),
+                                    column: columns.previous.name().to_owned(),
                                 },
                                 step_index,
-                            )
+                            );
                         }
 
-                        for added_column_idx in &redefine_table.added_columns {
-                            let column = schemas.next.walk(*added_column_idx);
-                            let has_virtual_default = redefine_table
-                                .added_columns_with_virtual_defaults
-                                .contains(added_column_idx);
-                            self.check_add_column(&column, has_virtual_default, &mut plan, step_index);
-                        }
-
-                        for dropped_column_idx in &redefine_table.dropped_columns {
-                            let column = schemas.previous.walk(*dropped_column_idx);
-                            self.check_column_drop(&column, &mut plan, step_index);
-                        }
-
-                        for (column_ides, changes, type_change) in redefine_table.column_pairs.iter() {
-                            let columns = schemas.walk(*column_ides);
-
-                            let arity_change_is_safe = match (&columns.previous.arity(), &columns.next.arity()) {
-                                // column became required
-                                (ColumnArity::Nullable, ColumnArity::Required) => false,
-                                // column became nullable
-                                (ColumnArity::Required, ColumnArity::Nullable) => true,
-                                // nothing changed
-                                (ColumnArity::Required, ColumnArity::Required)
-                                | (ColumnArity::Nullable, ColumnArity::Nullable)
-                                | (ColumnArity::List, ColumnArity::List) => true,
-                                // not supported on SQLite
-                                (ColumnArity::List, _) | (_, ColumnArity::List) => unreachable!(),
-                            };
-
-                            if !changes.type_changed() && arity_change_is_safe {
-                                continue;
-                            }
-
-                            if changes.arity_changed()
-                                && columns.next.arity().is_required()
-                                && columns.next.default().is_none()
-                            {
-                                plan.push_unexecutable(
-                                    UnexecutableStepCheck::MadeOptionalFieldRequired {
-                                        table: columns.previous.table().name().to_owned(),
-                                        column: columns.previous.name().to_owned(),
-                                    },
-                                    step_index,
-                                );
-                            }
-
-                            match type_change {
-                                Some(ColumnTypeChange::SafeCast) | None => (),
-                                Some(ColumnTypeChange::RiskyCast) => {
-                                    plan.push_warning(
-                                        SqlMigrationWarningCheck::RiskyCast {
-                                            table: columns.previous.table().name().to_owned(),
-                                            column: columns.previous.name().to_owned(),
-                                            previous_type: format!("{:?}", columns.previous.column_type_family()),
-                                            next_type: format!("{:?}", columns.next.column_type_family()),
-                                        },
-                                        step_index,
-                                    );
-                                }
-                                Some(ColumnTypeChange::NotCastable) => plan.push_warning(
-                                    SqlMigrationWarningCheck::NotCastable {
+                        match type_change {
+                            Some(ColumnTypeChange::SafeCast) | None => (),
+                            Some(ColumnTypeChange::RiskyCast) => {
+                                plan.push_warning(
+                                    SqlMigrationWarningCheck::RiskyCast {
                                         table: columns.previous.table().name().to_owned(),
                                         column: columns.previous.name().to_owned(),
                                         previous_type: format!("{:?}", columns.previous.column_type_family()),
                                         next_type: format!("{:?}", columns.next.column_type_family()),
                                     },
                                     step_index,
-                                ),
+                                );
                             }
+                            Some(ColumnTypeChange::NotCastable) => plan.push_warning(
+                                SqlMigrationWarningCheck::NotCastable {
+                                    table: columns.previous.table().name().to_owned(),
+                                    column: columns.previous.name().to_owned(),
+                                    previous_type: format!("{:?}", columns.previous.column_type_family()),
+                                    next_type: format!("{:?}", columns.next.column_type_family()),
+                                },
+                                step_index,
+                            ),
                         }
                     }
                 }

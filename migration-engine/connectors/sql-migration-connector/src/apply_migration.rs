@@ -128,7 +128,7 @@ fn render_raw_sql(
         }
         SqlMigrationStepKind::AlterPrimaryKey(table_id) => renderer.render_alter_primary_key(schemas.walk(*table_id)),
         SqlMigrationStepKind::AlterEnum(alter_enum) => renderer.render_alter_enum(alter_enum, schemas),
-        SqlMigrationStepKind::RedefineTables(redefine_tables) => renderer.render_redefine_tables(redefine_tables, schemas),
+        SqlMigrationStepKind::RedefineTable(redefine_table) => renderer.render_redefine_table(redefine_table, schemas),
         SqlMigrationStepKind::CreateEnum(enum_id) => renderer.render_create_enum(schemas.next.walk(*enum_id)),
         SqlMigrationStepKind::CreateSchema(namespace_id) => {
             vec![renderer.render_create_namespace(schemas.next.walk(*namespace_id))]

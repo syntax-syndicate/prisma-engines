@@ -460,54 +460,52 @@ impl SqlRenderer for PostgresFlavour {
         .to_string()
     }
 
-    fn render_redefine_tables(&self, tables: &[RedefineTable], schemas: Pair<&SqlSchema>) -> Vec<String> {
+    fn render_redefine_table(&self, redefine_table: &RedefineTable, schemas: Pair<&SqlSchema>) -> Vec<String> {
         let mut result = Vec::new();
 
-        for redefine_table in tables {
-            let tables = schemas.walk(redefine_table.table_ids);
-            let temporary_table_name = format!("_prisma_new_{}", &tables.next.name());
-            result.push(self.render_create_table_as(
-                tables.next,
-                TableName(None, Quoted::postgres_ident(&temporary_table_name)),
+        let tables = schemas.walk(redefine_table.table_ids);
+        let temporary_table_name = format!("_prisma_new_{}", &tables.next.name());
+        result.push(self.render_create_table_as(
+            tables.next,
+            TableName(None, Quoted::postgres_ident(&temporary_table_name)),
+        ));
+
+        let columns: Vec<_> = redefine_table
+            .column_pairs
+            .iter()
+            .map(|(column_ids, _, _)| schemas.walk(*column_ids).next.name())
+            .map(|c| Quoted::postgres_ident(c).to_string())
+            .collect();
+
+        let table = tables.previous.name();
+
+        for index in tables.previous.indexes().filter(|idx| !idx.is_primary_key()) {
+            result.push(self.render_drop_index(index));
+        }
+
+        if !columns.is_empty() {
+            let column_names = columns.join(",");
+            result.push(format!(
+                r#"INSERT INTO "{temporary_table_name}" ({column_names}) SELECT {column_names} FROM "{table}""#
             ));
+        }
 
-            let columns: Vec<_> = redefine_table
-                .column_pairs
-                .iter()
-                .map(|(column_ids, _, _)| schemas.walk(*column_ids).next.name())
-                .map(|c| Quoted::postgres_ident(c).to_string())
-                .collect();
-
-            let table = tables.previous.name();
-
-            for index in tables.previous.indexes().filter(|idx| !idx.is_primary_key()) {
-                result.push(self.render_drop_index(index));
+        result.push(
+            ddl::DropTable {
+                table_name: tables.previous.name().into(),
+                cascade: true,
             }
+            .to_string(),
+        );
 
-            if !columns.is_empty() {
-                let column_names = columns.join(",");
-                result.push(format!(
-                    r#"INSERT INTO "{temporary_table_name}" ({column_names}) SELECT {column_names} FROM "{table}""#
-                ));
-            }
+        result.push(self.render_rename_table(&temporary_table_name, tables.next.name()));
 
-            result.push(
-                ddl::DropTable {
-                    table_name: tables.previous.name().into(),
-                    cascade: true,
-                }
-                .to_string(),
-            );
+        for index in tables.next.indexes().filter(|idx| !idx.is_primary_key()) {
+            result.push(self.render_create_index(index));
+        }
 
-            result.push(self.render_rename_table(&temporary_table_name, tables.next.name()));
-
-            for index in tables.next.indexes().filter(|idx| !idx.is_primary_key()) {
-                result.push(self.render_create_index(index));
-            }
-
-            for fk in tables.next.foreign_keys() {
-                result.push(self.render_add_foreign_key(fk));
-            }
+        for fk in tables.next.foreign_keys() {
+            result.push(self.render_add_foreign_key(fk));
         }
 
         result

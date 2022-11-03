@@ -7,7 +7,7 @@ use enumflags2::BitFlags;
 use sql_schema_describer::{
     postgres::{self, PostgresSchemaExt},
     walkers::{ColumnWalker, TableWalker},
-    ColumnId, EnumId, ForeignKeyId, IndexId, SqlSchema, TableId, UdtId, ViewId, NamespaceId,
+    ColumnId, EnumId, ForeignKeyId, IndexId, NamespaceId, SqlSchema, TableId, UdtId, ViewId,
 };
 use std::{collections::BTreeSet, fmt::Write as _};
 
@@ -123,14 +123,12 @@ impl SqlMigration {
                 SqlMigrationStepKind::CreateTable { .. } => {
                     drift_items.insert((DriftType::AddedTable, "", idx));
                 }
-                SqlMigrationStepKind::RedefineTables(redefines) => {
-                    for redefine in redefines {
-                        drift_items.insert((
-                            DriftType::RedefinedTable,
-                            self.schemas().walk(redefine.table_ids).previous.name(),
-                            idx,
-                        ));
-                    }
+                SqlMigrationStepKind::RedefineTable(redefine) => {
+                    drift_items.insert((
+                        DriftType::RedefinedTable,
+                        self.schemas().walk(redefine.table_ids).previous.name(),
+                        idx,
+                    ));
                 }
                 SqlMigrationStepKind::RenameForeignKey { foreign_key_id } => {
                     drift_items.insert((
@@ -351,7 +349,7 @@ impl SqlMigration {
                     out.push_str(self.schemas().next.walk(*table_id).name());
                     out.push('\n');
                 }
-                SqlMigrationStepKind::RedefineTables(_) => {}
+                SqlMigrationStepKind::RedefineTable(_) => {}
                 SqlMigrationStepKind::RenameForeignKey { foreign_key_id } => {
                     let fks = self.schemas().walk(*foreign_key_id);
                     out.push_str("  [*] Renamed the foreign key \"");
@@ -503,7 +501,7 @@ pub(crate) enum SqlMigrationStepKind {
     CreateTable {
         table_id: TableId,
     },
-    RedefineTables(Vec<RedefineTable>),
+    RedefineTable(RedefineTable),
     // Order matters: we must create indexes after ALTER TABLEs because the indexes can be
     // on fields that are dropped/created there.
     CreateIndex {
@@ -546,7 +544,7 @@ impl SqlMigrationStepKind {
             SqlMigrationStepKind::DropUserDefinedType(_) => "DropUserDefinedType",
             SqlMigrationStepKind::DropView(_) => "DropView",
             SqlMigrationStepKind::RedefineIndex { .. } => "RedefineIndex",
-            SqlMigrationStepKind::RedefineTables { .. } => "RedefineTables",
+            SqlMigrationStepKind::RedefineTable { .. } => "RedefineTable",
             SqlMigrationStepKind::RenameForeignKey { .. } => "RenameForeignKey",
             SqlMigrationStepKind::RenameIndex { .. } => "RenameIndex",
             SqlMigrationStepKind::CreateExtension(_) => "CreateExtension",

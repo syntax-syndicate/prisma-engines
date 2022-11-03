@@ -313,7 +313,7 @@ impl SqlRenderer for MysqlFlavour {
         })
     }
 
-    fn render_redefine_tables(&self, _names: &[RedefineTable], _schemas: Pair<&SqlSchema>) -> Vec<String> {
+    fn render_redefine_table(&self, _names: &RedefineTable, _schemas: Pair<&SqlSchema>) -> Vec<String> {
         unreachable!("render_redefine_table on MySQL")
     }
 

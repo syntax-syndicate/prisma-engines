@@ -183,32 +183,30 @@ impl SqlRenderer for SqliteFlavour {
         })
     }
 
-    fn render_redefine_tables(&self, tables: &[RedefineTable], schemas: Pair<&SqlSchema>) -> Vec<String> {
+    fn render_redefine_table(&self, redefine_table: &RedefineTable, schemas: Pair<&SqlSchema>) -> Vec<String> {
         // Based on 'Making Other Kinds Of Table Schema Changes' from https://www.sqlite.org/lang_altertable.html
         let mut result = vec!["PRAGMA foreign_keys=OFF".to_string()];
 
-        for redefine_table in tables {
-            let tables = schemas.walk(redefine_table.table_ids);
-            let temporary_table_name = format!("new_{}", &tables.next.name());
+        let tables = schemas.walk(redefine_table.table_ids);
+        let temporary_table_name = format!("new_{}", &tables.next.name());
 
-            result.push(self.render_create_table_as(
-                tables.next,
-                TableName(None, Quoted::sqlite_ident(&temporary_table_name)),
-            ));
+        result.push(self.render_create_table_as(
+            tables.next,
+            TableName(None, Quoted::sqlite_ident(&temporary_table_name)),
+        ));
 
-            copy_current_table_into_new_table(&mut result, redefine_table, tables, &temporary_table_name);
+        copy_current_table_into_new_table(&mut result, redefine_table, tables, &temporary_table_name);
 
-            result.push(format!(r#"DROP TABLE "{}""#, tables.previous.name()));
+        result.push(format!(r#"DROP TABLE "{}""#, tables.previous.name()));
 
-            result.push(format!(
-                r#"ALTER TABLE "{old_name}" RENAME TO "{new_name}""#,
-                old_name = temporary_table_name,
-                new_name = tables.next.name(),
-            ));
+        result.push(format!(
+            r#"ALTER TABLE "{old_name}" RENAME TO "{new_name}""#,
+            old_name = temporary_table_name,
+            new_name = tables.next.name(),
+        ));
 
-            for index in tables.next.indexes().filter(|idx| !idx.is_primary_key()) {
-                result.push(self.render_create_index(index));
-            }
+        for index in tables.next.indexes().filter(|idx| !idx.is_primary_key()) {
+            result.push(self.render_create_index(index));
         }
 
         result.push("PRAGMA foreign_key_check".to_string());
