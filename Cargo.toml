@@ -24,6 +24,7 @@ members = [
   "query-engine/request-handlers",
   "query-engine/schema",
   "query-engine/schema-builder",
+  "query-engine/schema-builder-wasm",
   "libs/*",
   "prisma-fmt",
   "prisma-fmt-wasm",

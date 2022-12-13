@@ -1520,9 +1520,9 @@ checksum = "6c8af84674fe1f223a982c933a0ee1086ac4d4052aa0fb8060c12c6ad838e754"
 
 [[package]]
 name = "js-sys"
-version = "0.3.56"
+version = "0.3.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a38fc24e30fd564ce974c02bf1d337caddff65be6cc4735a1f7eab22a7440f04"
+checksum = "49409df3e3bf0856b916e2ceaca09ee28e6871cf7d9ce97a692cacfdb2a25a47"
 dependencies = [
  "wasm-bindgen",
 ]
@@ -3704,6 +3704,19 @@ dependencies = [
  "prisma-models",
  "psl",
  "schema",
+]
+
+[[package]]
+name = "schema-builder-wasm"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "prisma-models",
+ "psl",
+ "schema",
+ "schema-builder",
+ "wasm-bindgen",
+ "wasm-logger",
 ]
 
 [[package]]
