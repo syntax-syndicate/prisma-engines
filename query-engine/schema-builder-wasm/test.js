@@ -15,4 +15,10 @@ generator client {
   }
 `)
 
-console.log(schema.query().getFields().map(f => f.name))
+console.log(schema.findQueryField('findFirstUser'))
+for (const f of schema.query().getFields()) {
+  console.log(f.name)
+  for (const arg of f.getArguments()) {
+    console.log(' ', arg.name, arg.getFieldTypes())
+  }
+}

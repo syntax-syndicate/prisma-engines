@@ -3711,6 +3711,7 @@ name = "schema-builder-wasm"
 version = "0.1.0"
 dependencies = [
  "js-sys",
+ "once_cell",
  "prisma-models",
  "psl",
  "schema",
