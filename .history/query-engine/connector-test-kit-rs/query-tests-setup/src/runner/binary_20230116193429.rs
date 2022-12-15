@@ -1,4 +1,5 @@
 use crate::{ConnectorTag, RunnerInterface, TestError, TestResult, TxResult};
+
 use query_core::{schema::QuerySchemaRef, TxId};
 use query_engine::opt::PrismaOpt;
 use query_engine::server::routes;
@@ -6,7 +7,7 @@ use query_engine::state::{self, State};
 use query_engine_metrics::MetricRegistry;
 use request_handlers::{GQLBatchResponse, GQLError, GQLResponse, GraphQlBody, MultiQuery, PrismaResponse};
 
-use hyper::{Body, HeaderMap, Method, Request, Response};
+use hyper::{Body, Method, Request, Response};
 use quaint::{prelude::Queryable, single::Quaint};
 use std::env;
 
@@ -250,7 +251,7 @@ fn json_to_gql_response(json_resp: &serde_json::Value) -> GQLResponse {
             let mut gql_response = GQLResponse::with_capacity(obj.keys().count());
 
             obj.iter().for_each(|(k, v)| {
-                gql_response.insert_data(k.to_string(), query_core::response_ir::Item::Json(v.clone()));
+                gql_response.insert_data(k.to_string(), query_core::Item::Json(v.clone()));
             });
             gql_response
         }
