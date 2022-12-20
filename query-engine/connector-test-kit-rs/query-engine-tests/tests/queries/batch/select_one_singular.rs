@@ -351,7 +351,7 @@ mod singular_batch {
             false,
             None,
         ))
-        .into_doc()
+        .into_doc(&runner.query_schema())
         .unwrap();
         let batch = match doc {
             QueryDocument::Multi(batch) => batch.compact(runner.query_schema()),

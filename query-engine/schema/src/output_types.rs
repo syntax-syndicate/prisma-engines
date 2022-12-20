@@ -87,6 +87,10 @@ impl OutputType {
     pub fn is_object(&self) -> bool {
         matches!(self, OutputType::Object(_))
     }
+
+    pub fn is_scalar(&self) -> bool {
+        matches!(self, OutputType::Scalar(_))
+    }
 }
 
 pub struct ObjectType {

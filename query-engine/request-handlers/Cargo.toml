@@ -11,6 +11,7 @@ psl.workspace = true
 dmmf_crate = { path = "../dmmf", package = "dmmf" }
 itertools = "0.10"
 graphql-parser = { git = "https://github.com/prisma/graphql-parser" }
+schema = { path = "../schema" }
 serde.workspace = true
 serde_json.workspace = true
 futures = "0.3"
@@ -20,3 +21,8 @@ thiserror = "1"
 tracing = "0.1"
 url = "2"
 connection-string = "0.1"
+
+[dev-dependencies]
+insta = "1.7.1"
+schema-builder = { path = "../schema-builder" }
+prisma-models = { path = "../prisma-models" }

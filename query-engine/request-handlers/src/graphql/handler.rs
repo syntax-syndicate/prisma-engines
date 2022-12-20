@@ -27,7 +27,7 @@ impl<'a> GraphQlHandler<'a> {
     pub async fn handle(&self, body: GraphQlBody, tx_id: Option<TxId>, trace_id: Option<String>) -> PrismaResponse {
         tracing::debug!("Incoming GraphQL query: {:?}", &body);
 
-        match body.into_doc() {
+        match body.into_doc(&self.query_schema) {
             Ok(QueryDocument::Single(query)) => self.handle_single(query, tx_id, trace_id).await,
             Ok(QueryDocument::Multi(batch)) => match batch.compact(self.query_schema) {
                 BatchDocument::Multi(batch, transaction) => {

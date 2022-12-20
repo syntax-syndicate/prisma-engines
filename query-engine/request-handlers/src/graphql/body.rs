@@ -1,5 +1,8 @@
+use crate::json_query::{convert_json_query_to_operation, JsonQuery};
+
 use super::GraphQLProtocolAdapter;
 use query_core::{BatchDocument, BatchDocumentTransaction, Operation, QueryDocument};
+use schema::QuerySchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -7,6 +10,7 @@ use std::collections::HashMap;
 #[serde(rename_all = "camelCase", untagged)]
 pub enum GraphQlBody {
     Single(SingleQuery),
+    SingleJson(JsonQuery),
     Multi(MultiQuery),
 }
 
@@ -54,11 +58,15 @@ impl From<&str> for SingleQuery {
 
 impl GraphQlBody {
     /// Convert a `GraphQlBody` into a `QueryDocument`.
-    pub fn into_doc(self) -> crate::Result<QueryDocument> {
+    pub fn into_doc(self, schema: &QuerySchema) -> crate::Result<QueryDocument> {
         match self {
             GraphQlBody::Single(body) => {
                 let operation = GraphQLProtocolAdapter::convert_query_to_operation(&body.query, body.operation_name)?;
 
+                Ok(QueryDocument::Single(operation))
+            }
+            GraphQlBody::SingleJson(body) => {
+                let operation = convert_json_query_to_operation(body, schema)?;
                 Ok(QueryDocument::Single(operation))
             }
             GraphQlBody::Multi(bodies) => {

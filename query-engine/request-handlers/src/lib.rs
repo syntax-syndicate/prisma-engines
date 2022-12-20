@@ -9,6 +9,7 @@ pub mod dmmf;
 
 mod error;
 mod graphql;
+mod json_query;
 mod transactions;
 
 #[cfg(test)]
