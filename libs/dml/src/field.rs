@@ -6,7 +6,6 @@ use crate::relation_info::RelationInfo;
 use crate::scalars::ScalarType;
 use crate::traits::{Ignorable, WithDatabaseName, WithName};
 use crate::{CompositeTypeFieldType, FieldArity};
-use psl_core::parser_database::ReferentialAction;
 
 /// Datamodel field type.
 #[derive(Debug, PartialEq, Clone)]
@@ -281,9 +280,6 @@ pub struct RelationField {
     /// Indicates if this field has to be ignored by the Client.
     pub is_ignored: bool,
 
-    /// Is `ON DELETE/UPDATE RESTRICT` allowed.
-    pub supports_restrict_action: Option<bool>,
-
     /// Do we run the referential actions in the core instead of the database.
     pub emulates_referential_actions: Option<bool>,
 }
@@ -298,14 +294,8 @@ impl RelationField {
             relation_info,
             documentation: None,
             is_ignored: false,
-            supports_restrict_action: None,
             emulates_referential_actions: None,
         }
-    }
-
-    /// The default `onDelete` can be `Restrict`.
-    pub fn supports_restrict_action(&mut self, value: bool) {
-        self.supports_restrict_action = Some(value);
     }
 
     /// The referential actions should be handled by the core.
@@ -331,22 +321,6 @@ impl RelationField {
 
     pub fn is_optional(&self) -> bool {
         self.arity.is_optional()
-    }
-
-    pub fn default_on_delete_action(&self) -> ReferentialAction {
-        use ReferentialAction::*;
-
-        match self.referential_arity {
-            FieldArity::Required if self.supports_restrict_action.unwrap_or(true) => Restrict,
-            FieldArity::Required => NoAction,
-            _ => SetNull,
-        }
-    }
-
-    pub fn default_on_update_action(&self) -> ReferentialAction {
-        use ReferentialAction::*;
-
-        Cascade
     }
 }
 

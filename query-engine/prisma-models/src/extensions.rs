@@ -18,10 +18,6 @@ pub trait ModelConverterUtilities {
     // Checks if a compound index is supported
     // A compound index is supported is none of its member are of type Unsupported
     fn is_compound_index_supported(&self, index: &dml::IndexDefinition) -> bool;
-
-    // Checks if a model can support the create operation.
-    // It can't if it has a field of type `Unsupported` required and without a default value
-    fn supports_create_operation(&self) -> bool;
 }
 
 impl ModelConverterUtilities for dml::Model {
@@ -44,19 +40,6 @@ impl ModelConverterUtilities for dml::Model {
 
             is_supported && !field.is_ignored()
         })
-    }
-
-    fn supports_create_operation(&self) -> bool {
-        let has_unsupported_field = self.fields.iter().any(|field| match field {
-            dml::Field::ScalarField(sf) => {
-                (sf.type_identifier() == TypeIdentifier::Unsupported || field.is_ignored())
-                    && sf.is_required()
-                    && sf.default_value.is_none()
-            }
-            _ => false,
-        });
-
-        !has_unsupported_field
     }
 
     fn has_supported_indexed_field(&self) -> bool {
@@ -94,7 +77,6 @@ impl ModelConverterUtilities for dml::Model {
 }
 
 pub trait DatamodelFieldExtensions {
-    fn type_identifier(&self) -> TypeIdentifier;
     fn internal_enum(&self, datamodel: &dml::Datamodel) -> Option<InternalEnum>;
     fn internal_enum_value(&self, enum_value: &dml::EnumValue) -> InternalEnumValue;
     fn native_type(&self) -> Option<NativeTypeInstance>;

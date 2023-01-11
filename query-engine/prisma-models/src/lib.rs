@@ -1,14 +1,10 @@
-#![allow(clippy::derive_partial_eq_without_eq)]
-
-mod builders;
 mod composite_type;
 mod convert;
+mod cursor;
 mod error;
-mod extensions;
 mod field;
 mod field_selection;
 mod fields;
-mod index;
 mod internal_data_model;
 mod internal_enum;
 mod model;
@@ -20,16 +16,13 @@ mod record;
 mod relation;
 mod selection_result;
 
-pub mod pk;
 pub mod prelude;
 
 pub use composite_type::*;
 pub use convert::convert;
-pub use error::*;
 pub use field::*;
 pub use field_selection::*;
 pub use fields::*;
-pub use index::*;
 pub use internal_data_model::*;
 pub use internal_enum::*;
 pub use model::*;
@@ -45,4 +38,7 @@ pub use selection_result::*;
 pub use prisma_value::*;
 pub use psl;
 
-pub type Result<T> = std::result::Result<T, DomainError>;
+type Result<T> = std::result::Result<T, error::DomainError>;
+
+use self::{cursor::Cursor, error::*, parent_container::*};
+use psl::{parser_database, schema_ast::ast};

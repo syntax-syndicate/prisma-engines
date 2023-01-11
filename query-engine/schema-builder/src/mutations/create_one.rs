@@ -15,16 +15,16 @@ use schema::{
 };
 
 /// Builds a create mutation field (e.g. createUser) for given model.
-pub(crate) fn create_one(ctx: &mut BuilderContext, model: &ModelRef) -> OutputField {
-    let args = create_one_arguments(ctx, model).unwrap_or_default();
+pub(crate) fn create_one(ctx: &mut BuilderContext, model: ModelRef) -> OutputField {
+    let args = create_one_arguments(ctx, &model).unwrap_or_default();
     let field_name = format!("createOne{}", model.name());
 
     field(
         field_name,
         args,
-        OutputType::object(objects::model::map_type(ctx, model)),
+        OutputType::object(objects::model::map_type(ctx, &model)),
         Some(QueryInfo {
-            model: Some(Arc::clone(model)),
+            model: Some(model),
             tag: QueryTag::CreateOne,
         }),
     )
@@ -85,7 +85,7 @@ fn checked_create_input_type(
 
     let filtered_fields = filter_checked_create_fields(model, parent_field);
     let field_mapper = CreateDataInputFieldMapper::new_checked();
-    let input_fields = field_mapper.map_all(ctx, &filtered_fields);
+    let input_fields = field_mapper.map_all(ctx, filtered_fields.into_iter());
 
     input_object.set_fields(input_fields);
     Arc::downgrade(&input_object)
@@ -116,7 +116,7 @@ fn unchecked_create_input_type(
 
     let filtered_fields = filter_unchecked_create_fields(model, parent_field);
     let field_mapper = CreateDataInputFieldMapper::new_unchecked();
-    let input_fields = field_mapper.map_all(ctx, &filtered_fields);
+    let input_fields = field_mapper.map_all(ctx, filtered_fields.into_iter());
 
     input_object.set_fields(input_fields);
     Arc::downgrade(&input_object)
@@ -162,7 +162,7 @@ fn filter_unchecked_create_fields(model: &ModelRef, parent_field: Option<&Relati
     model.fields().filter_all(|field| match field {
         // In principle, all scalars are writable for unchecked inputs. However, it still doesn't make any sense to be able to write the scalars that
         // link the model to the parent record in case of a nested unchecked create, as this would introduce complexities we don't want to deal with right now.
-        ModelField::Scalar(sf) => !linking_fields.contains(sf),
+        ModelField::Scalar(sf) => !linking_fields.contains(&sf),
 
         // If the relation field `rf` is the one that was traversed to by the parent relation field `parent_field`,
         // then exclude it for checked inputs - this prevents endless nested type circles that are useless to offer as API.

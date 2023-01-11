@@ -18,7 +18,7 @@ pub mod traits;
 
 pub use self::{
     composite_type::*, datamodel::*, default_value::*, field::*, model::*, native_type_instance::*, r#enum::*,
-    relation_info::*, scalars::*, traits::*,
+    relation_info::*, scalars::*, traits::*,native_type_instance::*,
 };
 pub use prisma_value::{self, PrismaValue};
 pub use psl_core::parser_database::{ast::FieldArity, IndexType, ReferentialAction};

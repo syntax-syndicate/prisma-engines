@@ -42,7 +42,7 @@ mod utils;
 
 use cache::TypeRefCache;
 use prisma_models::{
-    CompositeTypeRef, Field as ModelField, Index, InternalDataModelRef, ModelRef, RelationFieldRef, TypeIdentifier,
+    CompositeTypeRef, Field as ModelField, InternalDataModelRef, ModelRef, RelationFieldRef, TypeIdentifier,
 };
 use psl::{
     datamodel_connector::{Connector, ConnectorCapability},
@@ -124,11 +124,11 @@ impl BuilderContext {
     }
 
     pub fn models(&self) -> Vec<ModelRef> {
-        self.internal_data_model.models_cloned()
+        self.internal_data_model.models().collect()
     }
 
     pub fn composite_types(&self) -> Vec<CompositeTypeRef> {
-        self.internal_data_model.composite_types().to_owned()
+        self.internal_data_model.composite_types().collect()
     }
 
     pub fn supports_any(&self, capabilities: &[ConnectorCapability]) -> bool {

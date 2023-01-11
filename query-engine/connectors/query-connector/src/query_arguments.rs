@@ -19,7 +19,6 @@ pub struct SkipAndLimit {
 /// A query argument struct is always valid over a single model only, meaning that all
 /// data referenced in a single query argument instance is always refering to data of
 /// a single model (e.g. the cursor projection, distinct projection, orderby, ...).
-#[derive(Clone)]
 pub struct QueryArguments {
     pub model: ModelRef,
     pub cursor: Option<SelectionResult>,

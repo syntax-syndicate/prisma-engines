@@ -94,9 +94,6 @@ impl<'a> LiftAstToDml<'a> {
             field.relation_info.name = relation_field.relation_name().to_string();
             field.documentation = ast_field.documentation().map(String::from);
             field.is_ignored = relation_field.is_ignored();
-            field.supports_restrict_action(
-                active_connector.supports_referential_action(&relation_mode, db::ReferentialAction::Restrict),
-            );
             field.emulates_referential_actions(relation_mode.is_prisma());
         };
 

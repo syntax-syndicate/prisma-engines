@@ -22,7 +22,7 @@ pub enum SortAggregation {
     Max,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub enum OrderBy {
     Scalar(OrderByScalar),
     ScalarAggregation(OrderByScalarAggregation),
@@ -115,19 +115,10 @@ impl OrderBy {
 }
 
 /// Describes a hop over to a relation or composite for an orderBy statement.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub enum OrderByHop {
     Relation(RelationFieldRef),
     Composite(CompositeFieldRef),
-}
-
-impl std::fmt::Debug for OrderByHop {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Relation(rf) => f.debug_tuple("Relation").field(&format!("{rf}")).finish(),
-            Self::Composite(cf) => f.debug_tuple("Composite").field(&format!("{cf}")).finish(),
-        }
-    }
 }
 
 impl OrderByHop {
@@ -163,7 +154,7 @@ impl From<CompositeFieldRef> for OrderByHop {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub struct OrderByScalar {
     pub field: ScalarFieldRef,
     pub path: Vec<OrderByHop>,
@@ -171,7 +162,7 @@ pub struct OrderByScalar {
     pub nulls_order: Option<NullsOrder>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub struct OrderByScalarAggregation {
     pub field: ScalarFieldRef,
     pub path: Vec<OrderByHop>,
@@ -179,14 +170,14 @@ pub struct OrderByScalarAggregation {
     pub sort_aggregation: SortAggregation,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub struct OrderByToManyAggregation {
     pub path: Vec<OrderByHop>,
     pub sort_order: SortOrder,
     pub sort_aggregation: SortAggregation,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub struct OrderByRelevance {
     pub fields: Vec<ScalarFieldRef>,
     pub sort_order: SortOrder,

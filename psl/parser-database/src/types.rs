@@ -95,7 +95,7 @@ pub enum ScalarFieldType {
     /// A composite type
     CompositeType(ast::CompositeTypeId),
     /// An enum
-    Enum(ast::EnumId),
+    Enum(ast::EnumId), // TODO
     /// A Prisma scalar type
     BuiltInScalar(ScalarType),
     /// An `Unsupported("...")` type

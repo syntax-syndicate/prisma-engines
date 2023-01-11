@@ -6,32 +6,39 @@ pub use composite::*;
 pub use relation::*;
 pub use scalar::*;
 
-// use crate::prelude::*;
+use crate::*;
 use psl::dml::ScalarType;
-use std::{hash::Hash, sync::Arc};
 
-use crate::ModelRef;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub enum Field {
-    Relation(RelationFieldRef),
-    Scalar(ScalarFieldRef),
-    Composite(CompositeFieldRef),
+    Scalar(ScalarField),
+    Relation(RelationField),
+    Composite(CompositeField),
 }
 
+pub type FieldWeak = Field;
+
 impl Field {
+    fn parent(&self) -> ParentContainer {
+        match self {
+            Field::Scalar(s) => s.container(),
+            Field::Relation(r) => ParentContainer::Model(r.model()),
+            Field::Composite(c) => c.container(),
+        }
+    }
+
     pub fn name(&self) -> &str {
         match self {
-            Field::Scalar(ref sf) => &sf.name,
-            Field::Relation(ref rf) => &rf.name,
-            Field::Composite(ref cf) => &cf.name,
+            Field::Scalar(s) => s.name(),
+            Field::Relation(r) => r.name(),
+            Field::Composite(c) => c.name(),
         }
     }
 
     pub fn db_name(&self) -> &str {
         match self {
             Field::Scalar(ref sf) => sf.db_name(),
-            Field::Relation(ref rf) => &rf.name,
+            Field::Relation(ref rf) => rf.name(),
             Field::Composite(ref cf) => cf.db_name(),
         }
     }
@@ -57,7 +64,7 @@ impl Field {
 
     pub fn is_id(&self) -> bool {
         match self {
-            Field::Scalar(sf) => sf.is_id,
+            Field::Scalar(sf) => sf.is_id(),
             Field::Relation(_) => false,
             Field::Composite(_) => false,
         }
@@ -94,29 +101,21 @@ impl Field {
         }
     }
 
-    pub fn model(&self) -> Option<ModelRef> {
+    pub fn model(&self) -> Option<Model> {
         match self {
-            Self::Scalar(sf) => sf.container.as_model(),
+            Self::Scalar(sf) => sf.container().as_model().cloned(),
             Self::Relation(rf) => Some(rf.model()),
-            Self::Composite(cf) => cf.container.as_model(),
+            Self::Composite(cf) => cf.container().as_model().cloned(),
         }
     }
 
-    pub fn scalar_fields(&self) -> Vec<ScalarFieldRef> {
-        match self {
-            Self::Scalar(sf) => vec![sf.clone()],
-            Self::Relation(rf) => rf.scalar_fields(),
-            Self::Composite(_cf) => vec![], // [Composites] todo
-        }
-    }
-
-    pub fn downgrade(&self) -> FieldWeak {
-        match self {
-            Field::Relation(field) => FieldWeak::Relation(Arc::downgrade(field)),
-            Field::Scalar(field) => FieldWeak::Scalar(Arc::downgrade(field)),
-            Field::Composite(field) => FieldWeak::Composite(Arc::downgrade(field)),
-        }
-    }
+    // pub fn scalar_fields(&self) -> Vec<ScalarFieldRef> {
+    //     match self {
+    //         Self::Scalar(sf) => vec![sf.clone()],
+    //         Self::Relation(rf) => rf.scalar_fields(),
+    //         Self::Composite(_cf) => vec![], // [Composites] todo
+    //     }
+    // }
 
     pub fn as_composite(&self) -> Option<&CompositeFieldRef> {
         if let Self::Composite(v) = self {
@@ -132,51 +131,6 @@ impl Field {
         } else {
             None
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum FieldWeak {
-    Relation(RelationFieldWeak),
-    Scalar(ScalarFieldWeak),
-    Composite(CompositeFieldWeak),
-}
-
-impl FieldWeak {
-    pub fn upgrade(&self) -> Field {
-        match self {
-            Self::Relation(rf) => rf.upgrade().unwrap().into(),
-            Self::Scalar(sf) => sf.upgrade().unwrap().into(),
-            Self::Composite(cf) => cf.upgrade().unwrap().into(),
-        }
-    }
-}
-
-impl From<&Field> for FieldWeak {
-    fn from(f: &Field) -> Self {
-        match f {
-            Field::Scalar(sf) => sf.into(),
-            Field::Relation(rf) => rf.into(),
-            Field::Composite(cf) => cf.into(),
-        }
-    }
-}
-
-impl From<&ScalarFieldRef> for FieldWeak {
-    fn from(f: &ScalarFieldRef) -> Self {
-        FieldWeak::Scalar(Arc::downgrade(f))
-    }
-}
-
-impl From<&RelationFieldRef> for FieldWeak {
-    fn from(f: &RelationFieldRef) -> Self {
-        FieldWeak::Relation(Arc::downgrade(f))
-    }
-}
-
-impl From<&CompositeFieldRef> for FieldWeak {
-    fn from(f: &CompositeFieldRef) -> Self {
-        FieldWeak::Composite(Arc::downgrade(f))
     }
 }
 

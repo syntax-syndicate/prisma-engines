@@ -10,7 +10,6 @@ pub struct ModelBuilder {
     pub manifestation: Option<String>,
     pub primary_key: Option<PrimaryKeyBuilder>,
     pub indexes: Vec<IndexBuilder>,
-    pub supports_create_operation: bool,
     pub dml_model: psl::dml::Model,
 }
 
@@ -28,7 +27,6 @@ impl ModelBuilder {
             primary_identifier: OnceCell::new(),
             dml_model: self.dml_model,
             internal_data_model,
-            supports_create_operation: self.supports_create_operation,
         });
 
         let all_fields: Vec<_> = self

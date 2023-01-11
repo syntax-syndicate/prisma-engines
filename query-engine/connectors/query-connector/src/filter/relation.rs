@@ -6,7 +6,7 @@ use std::sync::Arc;
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct RelationFilter {
     /// Starting field of the relation traversal.
-    pub field: Arc<RelationField>,
+    pub field: RelationField,
 
     /// Filter the related records need to fulfill.
     pub nested_filter: Box<Filter>,
@@ -20,7 +20,7 @@ pub struct RelationFilter {
 impl std::fmt::Debug for RelationFilter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RelationFilter")
-            .field("field", &format!("{}", self.field))
+            .field("field", &self.field)
             .field("nested_filter", &self.nested_filter)
             .field("condition", &self.condition)
             .finish()
@@ -48,7 +48,7 @@ impl RelationFilter {
 /// Todo there's no good, obvious reason why this is a separate filter.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OneRelationIsNullFilter {
-    pub field: Arc<RelationField>,
+    pub field: RelationField,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -89,14 +89,14 @@ impl RelationCondition {
     }
 }
 
-impl RelationCompare for Arc<RelationField> {
+impl RelationCompare for RelationField {
     /// Every related record matches the filter.
     fn every_related<T>(&self, filter: T) -> Filter
     where
         T: Into<Filter>,
     {
         Filter::from(RelationFilter {
-            field: Arc::clone(self),
+            field: self.clone(),
             nested_filter: Box::new(filter.into()),
             condition: RelationCondition::EveryRelatedRecord,
         })
@@ -108,7 +108,7 @@ impl RelationCompare for Arc<RelationField> {
         T: Into<Filter>,
     {
         Filter::from(RelationFilter {
-            field: Arc::clone(self),
+            field: self.clone(),
             nested_filter: Box::new(filter.into()),
             condition: RelationCondition::AtLeastOneRelatedRecord,
         })
@@ -120,7 +120,7 @@ impl RelationCompare for Arc<RelationField> {
         T: Into<Filter>,
     {
         Filter::from(RelationFilter {
-            field: Arc::clone(self),
+            field: self.clone(),
             nested_filter: Box::new(filter.into()),
             condition: RelationCondition::ToOneRelatedRecord,
         })
@@ -132,7 +132,7 @@ impl RelationCompare for Arc<RelationField> {
         T: Into<Filter>,
     {
         Filter::from(RelationFilter {
-            field: Arc::clone(self),
+            field: self.clone(),
             nested_filter: Box::new(filter.into()),
             condition: RelationCondition::NoRelatedRecord,
         })
@@ -141,7 +141,7 @@ impl RelationCompare for Arc<RelationField> {
     /// One of the relations is `Null`.
     fn one_relation_is_null(&self) -> Filter {
         Filter::from(OneRelationIsNullFilter {
-            field: Arc::clone(self),
+            field: self.clone(),
         })
     }
 }

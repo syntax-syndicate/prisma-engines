@@ -1,8 +1,8 @@
-use crate::{DomainError, FieldSelection, ModelProjection, OrderBy, PrismaValue, SelectionResult, SortOrder};
+use crate::*;
 use itertools::Itertools;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SingleRecord {
     pub record: Record,
     pub field_names: Vec<String>,
@@ -32,7 +32,7 @@ impl SingleRecord {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct ManyRecords {
     pub records: Vec<Record>,
     pub field_names: Vec<String>,
@@ -137,7 +137,7 @@ impl From<(Vec<Vec<PrismaValue>>, &FieldSelection)> for ManyRecords {
     }
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Default, Hash, PartialEq, Eq, Clone)]
 pub struct Record {
     pub values: Vec<PrismaValue>,
     pub parent_id: Option<SelectionResult>,
@@ -159,36 +159,36 @@ impl Record {
         field_names: &[String],
         extraction_selection: &FieldSelection,
     ) -> crate::Result<SelectionResult> {
-        let pairs: Vec<_> = extraction_selection
+        let pairs = extraction_selection
             .selections()
             .into_iter()
             .map(|selection| {
                 self.get_field_value(field_names, selection.db_name())
                     .and_then(|val| Ok((selection.clone(), selection.coerce_value(val.clone())?)))
             })
-            .collect::<crate::Result<Vec<_>>>()?;
+            .collect::<crate::Result<Vec<(SelectedField, _)>>>()?;
 
         Ok(SelectionResult::new(pairs))
     }
 
-    pub fn identifying_values(
-        &self,
-        field_names: &[String],
-        model_projection: &ModelProjection,
-    ) -> crate::Result<Vec<&PrismaValue>> {
-        let x: Vec<&PrismaValue> = model_projection
-            .fields()
-            .into_iter()
-            .flat_map(|field| {
-                field
-                    .scalar_fields()
-                    .into_iter()
-                    .map(|source_field| self.get_field_value(field_names, &source_field.name))
-            })
-            .collect::<crate::Result<Vec<_>>>()?;
+    // pub fn identifying_values(
+    //     &self,
+    //     field_names: &[String],
+    //     model_projection: &ModelProjection,
+    // ) -> crate::Result<Vec<&PrismaValue>> {
+    //     let x: Vec<&PrismaValue> = model_projection
+    //         .fields()
+    //         .into_iter()
+    //         .flat_map(|field| {
+    //             field
+    //                 .scalar_fields()
+    //                 .into_iter()
+    //                 .map(|source_field| self.get_field_value(field_names, source_field.name()))
+    //         })
+    //         .collect::<crate::Result<Vec<_>>>()?;
 
-        Ok(x)
-    }
+    //     Ok(x)
+    // }
 
     pub fn get_field_value(&self, field_names: &[String], field: &str) -> crate::Result<&PrismaValue> {
         let index = field_names.iter().position(|r| r == field).map(Ok).unwrap_or_else(|| {

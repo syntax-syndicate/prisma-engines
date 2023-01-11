@@ -16,8 +16,8 @@ use schema::{
 };
 
 /// Builds a create many mutation field (e.g. createManyUsers) for given model.
-pub(crate) fn create_many(ctx: &mut BuilderContext, model: &ModelRef) -> Option<OutputField> {
-    let arguments = create_many_arguments(ctx, model);
+pub(crate) fn create_many(ctx: &mut BuilderContext, model: ModelRef) -> Option<OutputField> {
+    let arguments = create_many_arguments(ctx, &model);
     let field_name = format!("createMany{}", model.name());
 
     if ctx.has_capability(ConnectorCapability::CreateMany) {
@@ -26,7 +26,7 @@ pub(crate) fn create_many(ctx: &mut BuilderContext, model: &ModelRef) -> Option<
             arguments,
             OutputType::object(objects::affected_records_object_type(ctx)),
             Some(QueryInfo {
-                model: Some(Arc::clone(model)),
+                model: Some(model),
                 tag: QueryTag::CreateMany,
             }),
         ))
@@ -71,7 +71,7 @@ pub(crate) fn create_many_object_type(
 
     let filtered_fields = filter_create_many_fields(ctx, model, parent_field);
     let field_mapper = CreateDataInputFieldMapper::new_checked();
-    let input_fields = field_mapper.map_all(ctx, &filtered_fields);
+    let input_fields = field_mapper.map_all(ctx, filtered_fields.into_iter());
 
     input_object.set_fields(input_fields);
     Arc::downgrade(&input_object)

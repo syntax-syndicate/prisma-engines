@@ -40,7 +40,7 @@ pub(crate) fn get_field_filter_types(
             let mut types = vec![InputType::object(full_scalar_filter_type(
                 ctx,
                 &sf.type_identifier(),
-                sf.native_type(),
+                sf.native_type_instance(),
                 sf.is_list(),
                 !sf.is_required(),
                 false,
@@ -59,7 +59,7 @@ pub(crate) fn get_field_filter_types(
 /// Builds shorthand relation equality (`is`) filter for to-one: `where: { relation_field: { ... } }` (no `is` in between).
 fn to_one_relation_filter_shorthand_types(ctx: &mut BuilderContext, rf: &RelationFieldRef) -> InputType {
     let related_model = rf.related_model();
-    let related_input_type = filter_objects::where_object_type(ctx, &related_model);
+    let related_input_type = filter_objects::where_object_type(ctx, related_model);
 
     InputType::object(related_input_type)
 }
@@ -79,7 +79,7 @@ fn to_many_relation_filter_object(ctx: &mut BuilderContext, rf: &RelationFieldRe
     let object = Arc::new(object);
     ctx.cache_input_type(ident, object.clone());
 
-    let related_input_type = filter_objects::where_object_type(ctx, &related_model);
+    let related_input_type = filter_objects::where_object_type(ctx, related_model);
 
     let fields = vec![
         input_field(filters::EVERY, InputType::object(related_input_type.clone()), None).optional(),
@@ -93,7 +93,7 @@ fn to_many_relation_filter_object(ctx: &mut BuilderContext, rf: &RelationFieldRe
 
 fn to_one_relation_filter_object(ctx: &mut BuilderContext, rf: &RelationFieldRef) -> InputObjectTypeWeakRef {
     let related_model = rf.related_model();
-    let related_input_type = filter_objects::where_object_type(ctx, &related_model);
+    let related_input_type = filter_objects::where_object_type(ctx, related_model);
     let ident = Identifier::new(
         format!("{}RelationFilter", capitalize(related_model.name())),
         PRISMA_NAMESPACE,
@@ -129,7 +129,7 @@ fn to_one_composite_filter_shorthand_types(ctx: &mut BuilderContext, cf: &Compos
 fn to_one_composite_filter_object(ctx: &mut BuilderContext, cf: &CompositeFieldRef) -> InputObjectTypeWeakRef {
     let nullable = if cf.is_optional() { "Nullable" } else { "" };
     let ident = Identifier::new(
-        format!("{}{}CompositeFilter", capitalize(&cf.typ.name), nullable),
+        format!("{}{}CompositeFilter", capitalize(cf.composite_type().name()), nullable),
         PRISMA_NAMESPACE,
     );
     return_cached_input!(ctx, &ident);
@@ -142,7 +142,7 @@ fn to_one_composite_filter_object(ctx: &mut BuilderContext, cf: &CompositeFieldR
 
     ctx.cache_input_type(ident, object.clone());
 
-    let composite_where_object = filter_objects::where_object_type(ctx, &cf.typ);
+    let composite_where_object = filter_objects::where_object_type(ctx, cf.composite_type());
     let composite_equals_object = filter_objects::composite_equality_object(ctx, cf);
 
     let mut fields = vec![
@@ -167,7 +167,7 @@ fn to_one_composite_filter_object(ctx: &mut BuilderContext, cf: &CompositeFieldR
 
 fn to_many_composite_filter_object(ctx: &mut BuilderContext, cf: &CompositeFieldRef) -> InputObjectTypeWeakRef {
     let ident = Identifier::new(
-        format!("{}CompositeListFilter", capitalize(&cf.typ.name)),
+        format!("{}CompositeListFilter", capitalize(cf.composite_type().name())),
         PRISMA_NAMESPACE,
     );
     return_cached_input!(ctx, &ident);
@@ -179,7 +179,7 @@ fn to_many_composite_filter_object(ctx: &mut BuilderContext, cf: &CompositeField
     let object = Arc::new(object);
     ctx.cache_input_type(ident, object.clone());
 
-    let composite_where_object = filter_objects::where_object_type(ctx, &cf.typ);
+    let composite_where_object = filter_objects::where_object_type(ctx, cf.composite_type());
     let composite_equals_object = filter_objects::composite_equality_object(ctx, cf);
 
     let mut fields = vec![

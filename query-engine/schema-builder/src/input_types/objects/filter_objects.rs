@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 pub(crate) fn scalar_filter_object_type(
     ctx: &mut BuilderContext,
-    model: &ModelRef,
+    model: ModelRef,
     include_aggregates: bool,
 ) -> InputObjectTypeWeakRef {
     let aggregate = if include_aggregates { "WithAggregates" } else { "" };
@@ -17,7 +17,7 @@ pub(crate) fn scalar_filter_object_type(
     return_cached_input!(ctx, &ident);
 
     let mut input_object = init_input_object_type(ident.clone());
-    input_object.set_tag(ObjectTag::WhereInputType(ParentContainer::Model(Arc::downgrade(model))));
+    input_object.set_tag(ObjectTag::WhereInputType(ParentContainer::Model(model)));
 
     let input_object = Arc::new(input_object);
     ctx.cache_input_type(ident, input_object.clone());

@@ -713,6 +713,7 @@ impl RelationAssertions for Relation {
         assert_eq!(self.name(), name);
         self
     }
+
     fn assert_model_a(&self, name: &str) -> &Self {
         assert_eq!(self.model_a().name(), name);
         self

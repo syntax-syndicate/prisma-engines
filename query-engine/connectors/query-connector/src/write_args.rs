@@ -4,7 +4,8 @@ use crate::{
 };
 use indexmap::{map::Keys, IndexMap};
 use prisma_models::{
-    CompositeFieldRef, Field, ModelProjection, ModelRef, PrismaValue, ScalarFieldRef, SelectedField, SelectionResult,
+    psl::parser_database::walkers::ScalarFieldWalker, CompositeFieldRef, Field, ModelProjection, ModelRef, PrismaValue,
+    ScalarFieldRef, SelectedField, SelectionResult,
 };
 use std::{borrow::Borrow, convert::TryInto, ops::Deref};
 
@@ -32,6 +33,12 @@ impl Deref for DatasourceFieldName {
 impl Borrow<str> for DatasourceFieldName {
     fn borrow(&self) -> &str {
         &self.0
+    }
+}
+
+impl From<ScalarFieldWalker<'_>> for DatasourceFieldName {
+    fn from(sf: ScalarFieldWalker<'_>) -> Self {
+        DatasourceFieldName(sf.database_name().to_owned())
     }
 }
 
@@ -295,19 +302,19 @@ impl NestedWrite {
             let nested_field = field
                 .as_composite()
                 .unwrap()
-                .typ
+                .composite_type()
                 .find_field_by_db_name(&db_name)
                 .unwrap();
             let mut new_path = field_path.clone();
 
-            new_path.add_segment(nested_field);
+            new_path.add_segment(&nested_field);
 
             match write {
                 WriteOperation::Composite(CompositeWriteOperation::Update(nested_write)) => {
-                    nested_writes.extend(nested_write.unfold_internal(nested_field, new_path));
+                    nested_writes.extend(nested_write.unfold_internal(&nested_field, new_path));
                 }
                 _ => {
-                    nested_writes.push((write, nested_field, new_path));
+                    nested_writes.push((write, &nested_field, new_path));
                 }
             }
         }
@@ -398,11 +405,11 @@ impl WriteArgs {
 
     // @updatedAt
     pub fn add_datetimes(&mut self, model: &ModelRef) {
-        let updated_at_fields = model.fields().updated_at();
+        let updated_at_fields = model.walker().scalar_fields().filter(|f| f.is_updated_at());
         let value = &self.request_now;
 
         for f in updated_at_fields {
-            if self.args.get(f.db_name()).is_none() {
+            if self.args.get(f.database_name()).is_none() {
                 self.args.insert(f.into(), WriteOperation::scalar_set(value.clone()));
             }
         }

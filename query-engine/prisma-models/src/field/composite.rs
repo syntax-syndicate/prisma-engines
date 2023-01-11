@@ -1,73 +1,35 @@
-use crate::{parent_container::ParentContainer, CompositeTypeRef};
-use psl::dml::FieldArity;
-use std::{
-    fmt::{Debug, Display},
-    hash::{Hash, Hasher},
-    sync::{Arc, Weak},
-};
+use crate::*;
 
-pub type CompositeFieldRef = Arc<CompositeField>;
-pub type CompositeFieldWeak = Weak<CompositeField>;
-
-#[derive(Clone)]
-pub struct CompositeField {
-    pub name: String,
-    pub typ: CompositeTypeRef,
-    pub(crate) db_name: Option<String>,
-    pub(crate) arity: FieldArity,
-    pub(crate) container: ParentContainer,
-}
+pub type CompositeField = crate::Cursor<(ast::CompositeTypeId, ast::FieldId)>;
+pub type CompositeFieldRef = CompositeField;
+pub type CompositeFieldWeak = CompositeField;
 
 impl CompositeField {
+    pub fn name(&self) -> &str {
+        self.walker().name()
+    }
+
     pub fn is_list(&self) -> bool {
-        matches!(self.arity, FieldArity::List)
+        self.walker().arity().is_list()
     }
 
     pub fn is_required(&self) -> bool {
-        matches!(self.arity, FieldArity::Required)
+        self.walker().arity().is_required()
     }
 
     pub fn is_optional(&self) -> bool {
-        matches!(self.arity, FieldArity::Optional)
+        self.walker().arity().is_optional()
     }
 
     pub fn db_name(&self) -> &str {
-        self.db_name.as_deref().unwrap_or(self.name.as_str())
+        self.walker().database_name()
     }
 
-    pub fn container(&self) -> &ParentContainer {
-        &self.container
+    pub fn composite_type(&self) -> CompositeType {
+        self.refocus(self.id.0)
     }
-}
 
-impl Debug for CompositeField {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CompositeField")
-            .field("name", &self.name)
-            .field("arity", &self.arity)
-            .field("container", &self.container)
-            .field("composite_type", &self.typ.name)
-            .finish()
-    }
-}
-
-impl Display for CompositeField {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}.{}", self.container().name(), self.name)
-    }
-}
-
-impl Hash for CompositeField {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        // Names are unique in the data model.
-        self.name.hash(state);
-    }
-}
-
-impl Eq for CompositeField {}
-
-impl PartialEq for CompositeField {
-    fn eq(&self, other: &CompositeField) -> bool {
-        self.name == other.name
+    pub fn container(&self) -> ParentContainer {
+        ParentContainer::CompositeType(self.composite_type())
     }
 }

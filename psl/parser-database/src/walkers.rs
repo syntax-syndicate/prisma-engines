@@ -50,6 +50,7 @@ where
 }
 
 impl crate::ParserDatabase {
+
     /// Find an enum by name.
     pub fn find_enum<'db>(&'db self, name: &str) -> Option<EnumWalker<'db>> {
         self.interner

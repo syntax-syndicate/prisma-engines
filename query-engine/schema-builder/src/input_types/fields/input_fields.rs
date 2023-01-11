@@ -168,7 +168,7 @@ pub(crate) fn nested_disconnect_input_field(
             if ctx.has_feature(PreviewFeature::ExtendedWhereUnique) {
                 types.push(InputType::object(filter_objects::where_object_type(
                     ctx,
-                    &parent_field.related_model(),
+                    parent_field.related_model(),
                 )));
             }
 
@@ -191,7 +191,7 @@ pub(crate) fn nested_delete_input_field(
             if ctx.has_feature(PreviewFeature::ExtendedWhereUnique) {
                 types.push(InputType::object(filter_objects::where_object_type(
                     ctx,
-                    &parent_field.related_model(),
+                    parent_field.related_model(),
                 )));
             }
 

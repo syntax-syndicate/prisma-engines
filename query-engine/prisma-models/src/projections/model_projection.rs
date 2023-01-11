@@ -1,9 +1,9 @@
-use crate::{dml::FieldArity, Field, FieldSelection, ScalarFieldRef, SelectedField, SelectionResult, TypeIdentifier};
+use crate::{Field, FieldSelection, ScalarFieldRef, SelectedField, SelectionResult};
 use itertools::Itertools;
 
 /// Projection of a `Model`. A projection is a (sub)set of fields of a model.
 /// There can only ever be fields of one model contained in a particular `ModelProjection`
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Default)]
 pub struct ModelProjection {
     fields: Vec<Field>,
 }
@@ -51,21 +51,21 @@ impl ModelProjection {
         self.fields.iter().map(|field| field.name())
     }
 
-    /// Returns all database (e.g. column or field) names of contained fields.
-    pub fn db_names(&self) -> impl Iterator<Item = String> + '_ {
-        self.scalar_fields().map(|f| f.db_name().to_owned())
-    }
+    // /// Returns all database (e.g. column or field) names of contained fields.
+    // pub fn db_names(&self) -> impl Iterator<Item = String> + '_ {
+    //     self.scalar_fields().map(|f| f.db_name().to_owned())
+    // }
 
     /// Returns an iterator over all fields contained in this projection.
     pub fn fields(&self) -> impl Iterator<Item = &Field> {
         self.fields.iter()
     }
 
-    /// Returns the length of scalar fields contained in this projection, e.g. the actual
-    /// number of SQL columns or document fields for this model projection.
-    pub fn scalar_length(&self) -> usize {
-        self.scalar_fields().count()
-    }
+    // /// Returns the length of scalar fields contained in this projection, e.g. the actual
+    // /// number of SQL columns or document fields for this model projection.
+    // pub fn scalar_length(&self) -> usize {
+    //     self.scalar_fields().count()
+    // }
 
     /// Returns an iterator over all scalar fields represented by this model projection, in order.
     /// Resolves relation fields to all backing scalar fields, if existing.
@@ -74,11 +74,11 @@ impl ModelProjection {
             .iter()
             .flat_map(|field| match field {
                 Field::Scalar(sf) => vec![sf.clone()],
-                Field::Relation(rf) => rf.scalar_fields(),
+                Field::Relation(rf) => rf.scalar_fields().collect(),
                 Field::Composite(_) => todo!(), // [Composites] todo
             })
             .into_iter()
-            .unique_by(|field| field.name.clone())
+            .unique_by(|field| field.name().to_owned())
     }
 
     pub fn map_db_name(&self, name: &str) -> Option<ScalarFieldRef> {
@@ -89,9 +89,9 @@ impl ModelProjection {
         })
     }
 
-    pub fn type_identifiers_with_arities(&self) -> Vec<(TypeIdentifier, FieldArity)> {
-        self.scalar_fields().map(|f| f.type_identifier_with_arity()).collect()
-    }
+    // pub fn type_identifiers_with_arities(&self) -> Vec<(TypeIdentifier, FieldArity)> {
+    //     self.scalar_fields().map(|f| f.type_identifier_with_arity()).collect()
+    // }
 }
 
 impl IntoIterator for ModelProjection {

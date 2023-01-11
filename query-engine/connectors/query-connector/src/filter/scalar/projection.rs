@@ -12,12 +12,12 @@ pub enum ScalarProjection {
 impl std::fmt::Debug for ScalarProjection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Single(sf) => f.debug_tuple("SingleProjection").field(&format!("{sf}")).finish(),
+            Self::Single(sf) => f.debug_tuple("SingleProjection").field(&sf).finish(),
             Self::Compound(sfs) => {
                 let mut dbg = f.debug_tuple("CompoundProjection");
 
                 for sf in sfs {
-                    dbg.field(&format!("{sf}"));
+                    dbg.field(&sf);
                 }
 
                 dbg.finish()

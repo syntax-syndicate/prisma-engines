@@ -10,14 +10,13 @@ use prisma_models::prelude::*;
 // Todo: This isn't final, this is only the first draft to get structure into the
 // wild cross-dependency waste that was the create/update inputs.
 pub(crate) trait DataInputFieldMapper {
-    fn map_all(&self, ctx: &mut BuilderContext, fields: &[Field]) -> Vec<InputField> {
+    fn map_all(&self, ctx: &mut BuilderContext, mut fields: impl Iterator<Item = Field>) -> Vec<InputField> {
         fields
-            .iter()
             .map(|field| match field {
-                Field::Scalar(sf) if sf.is_list() => self.map_scalar_list(ctx, sf),
-                Field::Scalar(sf) => self.map_scalar(ctx, sf),
-                Field::Relation(rf) => self.map_relation(ctx, rf),
-                Field::Composite(cf) => self.map_composite(ctx, cf),
+                Field::Scalar(sf) if sf.is_list() => self.map_scalar_list(ctx, &sf),
+                Field::Scalar(sf) => self.map_scalar(ctx, &sf),
+                Field::Relation(rf) => self.map_relation(ctx, &rf),
+                Field::Composite(cf) => self.map_composite(ctx, &cf),
             })
             .collect()
     }

@@ -60,7 +60,7 @@ pub(crate) fn order_by_object_type(
         .filter_map(|field| match field {
             // We exclude composites if we're in aggregations land (groupBy).
             ModelField::Composite(_) if options.include_scalar_aggregations => None,
-            _ => orderby_field_mapper(field, ctx, options),
+            _ => orderby_field_mapper(&field, ctx, options),
         })
         .collect();
 
@@ -151,14 +151,14 @@ fn orderby_field_mapper(field: &ModelField, ctx: &mut BuilderContext, options: &
 
         // Composite field.
         ModelField::Composite(cf) if cf.is_list() => {
-            let to_many_aggregate_type = order_by_to_many_aggregate_object_type(ctx, &(&cf.typ).into());
-            Some(input_field(cf.name.clone(), InputType::object(to_many_aggregate_type), None).optional())
+            let to_many_aggregate_type = order_by_to_many_aggregate_object_type(ctx, &cf.composite_type().into());
+            Some(input_field(cf.name(), InputType::object(to_many_aggregate_type), None).optional())
         }
 
         ModelField::Composite(cf) => {
-            let composite_order_object_type = order_by_object_type(ctx, &(&cf.typ).into(), &OrderByOptions::new());
+            let composite_order_object_type = order_by_object_type(ctx, &cf.composite_type(), &OrderByOptions::new());
 
-            Some(input_field(cf.name.clone(), InputType::object(composite_order_object_type), None).optional())
+            Some(input_field(cf.name(), InputType::object(composite_order_object_type), None).optional())
         }
 
         _ => None,
