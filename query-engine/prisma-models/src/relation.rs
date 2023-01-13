@@ -13,7 +13,7 @@ impl Relation {
     pub const TABLE_ALIAS: &'static str = "RelationTable";
 
     pub fn name(&self) -> &str {
-        &self.name
+        self.walker().explicit_relation_name().unwrap_or("")
     }
 
     /// Returns `true` only if the `Relation` is just a link between two
@@ -148,8 +148,22 @@ impl Relation {
         }
     }
 
-    pub fn manifestation(&self) -> &RelationLinkManifestation {
-        &self.manifestation
+    pub fn manifestation(&self) -> RelationLinkManifestation {
+        match self.walker().refine() {
+            parser_database::walkers::RefinedRelationWalker::Inline(rel) => {
+                RelationLinkManifestation::Inline(InlineRelation {
+                    in_table_of_model_name: rel.referencing_model().name().to_owned(),
+                })
+            }
+            parser_database::walkers::RefinedRelationWalker::ImplicitManyToMany(rel) => {
+                RelationLinkManifestation::RelationTable(RelationTable {
+                    table: format!("_{}", rel.relation_name()),
+                    model_a_column: "A".to_owned(),
+                    model_b_column: "B".to_owned(),
+                })
+            }
+            parser_database::walkers::RefinedRelationWalker::TwoWayEmbeddedManyToMany(_) => todo!(), // TODO
+        }
     }
 }
 

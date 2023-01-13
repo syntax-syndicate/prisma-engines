@@ -1,7 +1,6 @@
 use crate::*;
 use itertools::Itertools;
 use prisma_value::PrismaValue;
-use std::fmt::Display;
 
 /// A selection of fields from a model.
 #[derive(Debug)]

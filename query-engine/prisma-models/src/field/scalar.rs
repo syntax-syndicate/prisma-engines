@@ -77,8 +77,8 @@ impl ScalarField {
         ParentContainer::Model(self.0.refocus(self.0.id.0))
     }
 
-    pub fn internal_enum(&self) -> Option<&InternalEnum> {
-        self.internal_enum.as_ref()
+    pub fn internal_enum(&self) -> Option<InternalEnum> {
+        self.walker().field_type_as_enum().map(|w| self.0.refocus(w.id))
     }
 
     pub fn default_value(&self) -> Option<&DefaultValue> {
@@ -86,6 +86,7 @@ impl ScalarField {
     }
 
     pub fn is_updated_at(&self) -> bool {
+        self.walker().is_updated_at()
         self.is_updated_at
     }
 
@@ -93,11 +94,11 @@ impl ScalarField {
         self.is_auto_generated_int_id
     }
 
-    pub fn native_type(&self) -> Option<&NativeTypeInstance> {
-        self.native_type.as_ref()
-    }
+    // pub fn native_type(&self) -> Option<&NativeTypeInstance> {
+    //     self.native_type.as_ref()
+    // }
 
     pub fn is_autoincrement(&self) -> bool {
-        self.is_autoincrement
+        self.walker().is_autoincrement()
     }
 }
