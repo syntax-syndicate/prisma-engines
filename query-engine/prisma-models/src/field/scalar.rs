@@ -81,17 +81,17 @@ impl ScalarField {
         self.walker().field_type_as_enum().map(|w| self.0.refocus(w.id))
     }
 
-    pub fn default_value(&self) -> Option<&DefaultValue> {
-        self.default_value.as_ref()
+    pub fn default_value(&self) -> Option<&dml::DefaultValue> {
+        todo!()
     }
 
     pub fn is_updated_at(&self) -> bool {
         self.walker().is_updated_at()
-        self.is_updated_at
     }
 
     pub fn is_auto_generated_int_id(&self) -> bool {
-        self.is_auto_generated_int_id
+        let w = self.walker();
+        w.is_autoincrement() && w.is_single_pk()
     }
 
     // pub fn native_type(&self) -> Option<&NativeTypeInstance> {

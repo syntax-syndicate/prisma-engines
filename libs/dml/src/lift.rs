@@ -418,11 +418,7 @@ impl<'a> LiftAstToDml<'a> {
             field.is_ignored = scalar_field.is_ignored();
             field.is_updated_at = scalar_field.is_updated_at();
             field.database_name = scalar_field.mapped_name().map(String::from);
-            field.default_value = scalar_field.default_value().map(|d| DefaultValue {
-                kind: dml_default_kind(d.value(), scalar_field.scalar_type()),
-                db_name: Some(d.constraint_name(self.connector).into())
-                    .filter(|_| self.connector.supports_named_default_values()),
-            });
+            field.default_value = lift_default_value(scalar_field, self.connector);
 
             model.add_field(Field::ScalarField(field));
         }
@@ -544,6 +540,13 @@ fn parser_database_sort_order_to_dml_sort_order(sort_order: db::SortOrder) -> So
 
 fn parser_database_scalar_type_to_dml_scalar_type(st: db::ScalarType) -> dml::ScalarType {
     st.as_str().parse().unwrap()
+}
+
+pub fn lift_default_value(scalar_field: ScalarFieldWalker<'_>, connector: &dyn Connector) -> Option<dml::DefaultValue> {
+    scalar_field.default_value().map(|d| DefaultValue {
+        kind: dml_default_kind(d.value(), scalar_field.scalar_type()),
+        db_name: Some(d.constraint_name(connector).into()).filter(|_| connector.supports_named_default_values()),
+    })
 }
 
 fn dml_default_kind(default_value: &ast::Expression, scalar_type: Option<ScalarType>) -> DefaultKind {

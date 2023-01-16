@@ -1,7 +1,6 @@
 use crate::compare::RelationCompare;
 use crate::filter::Filter;
 use prisma_models::RelationField;
-use std::sync::Arc;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct RelationFilter {

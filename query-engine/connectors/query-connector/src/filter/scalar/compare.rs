@@ -1,8 +1,6 @@
 use super::*;
 use crate::*;
-
 use prisma_models::*;
-use std::sync::Arc;
 
 impl ScalarCompare for ScalarFieldRef {
     /// Field is in a given value
