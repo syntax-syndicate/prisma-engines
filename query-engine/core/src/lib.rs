@@ -15,8 +15,8 @@ pub mod telemetry;
 
 pub use self::{
     error::{CoreError, FieldConversionError},
-    executor::QueryExecutor,
-    interactive_transactions::{TransactionError, TxId},
+    executor::{QueryExecutor, TransactionOptions},
+    interactive_transactions::{ExtendedTransactionUserFacingError, TransactionError, TxId},
     query_document::*,
     telemetry::*,
 };

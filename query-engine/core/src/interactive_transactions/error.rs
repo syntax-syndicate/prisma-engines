@@ -1,5 +1,10 @@
 use thiserror::Error;
 
+use crate::{
+    response_ir::{Item, Map},
+    CoreError,
+};
+
 #[derive(Debug, Error, PartialEq)]
 pub enum TransactionError {
     #[error("Unable to start a transaction in the given time.")]
@@ -24,17 +29,17 @@ pub struct ExtendedTransactionUserFacingError {
     user_facing_error: user_facing_errors::Error,
 
     #[serde(skip_serializing_if = "indexmap::IndexMap::is_empty")]
-    extensions: crate::Map,
+    extensions: Map,
 }
 
 impl ExtendedTransactionUserFacingError {
     pub fn set_extension(&mut self, key: String, val: serde_json::Value) {
-        self.extensions.entry(key).or_insert(crate::Item::Json(val));
+        self.extensions.entry(key).or_insert(Item::Json(val));
     }
 }
 
-impl From<crate::CoreError> for ExtendedTransactionUserFacingError {
-    fn from(error: crate::CoreError) -> Self {
+impl From<CoreError> for ExtendedTransactionUserFacingError {
+    fn from(error: CoreError) -> Self {
         ExtendedTransactionUserFacingError {
             user_facing_error: error.into(),
             extensions: Default::default(),
