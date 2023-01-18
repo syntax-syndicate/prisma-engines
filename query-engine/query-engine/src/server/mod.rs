@@ -327,7 +327,7 @@ async fn transaction_commit_handler(
         span: _,
         trace_id: _,
         capture_config,
-    } = ServerExecutionContext::builder(&req.headers())
+    } = ServerExecutionContext::builder(req.headers())
         .with_tx_id(tx_id.clone())
         .build();
 
@@ -359,7 +359,7 @@ async fn transaction_rollback_handler(
         span: _,
         trace_id: _,
         capture_config,
-    } = ServerExecutionContext::builder(&req.headers())
+    } = ServerExecutionContext::builder(req.headers())
         .with_tx_id(tx_id.clone())
         .build();
 

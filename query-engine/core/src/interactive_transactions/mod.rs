@@ -74,7 +74,7 @@ impl Display for TxId {
     }
 }
 
-impl Into<opentelemetry::Context> for TxId {
+impl From<TxId> for opentelemetry::Context {
     // This is a bit of a hack, but it's the only way to have a default trace span for a whole
     // transaction when no traceparent is propagated from the client.
     //
@@ -87,8 +87,8 @@ impl Into<opentelemetry::Context> for TxId {
     //
     // By generating this "fake" traceparent based on the transaction id, we can have a common trace_id
     // for all transaction operations.
-    fn into(self) -> opentelemetry::Context {
-        let trace_id: opentelemetry::trace::TraceId = self.into();
+    fn from(id: TxId) -> Self {
+        let trace_id: opentelemetry::trace::TraceId = id.into();
         let traceparent = format!("00-{}-0000000000000001-01", trace_id);
 
         let extractor: HashMap<String, String> = HashMap::from_iter(vec![("traceparent".to_string(), traceparent)]);
@@ -96,7 +96,7 @@ impl Into<opentelemetry::Context> for TxId {
     }
 }
 
-impl Into<opentelemetry::trace::TraceId> for TxId {
+impl From<TxId> for opentelemetry::trace::TraceId {
     // in order to convert a TxId (a 48 bytes cuid) into a TraceId (16 bytes), we remove the first byte,
     // (always 'c') and get the next 16 bytes, which are random enough to be used as a trace id.
     // this is a typical cuid: "c-lct0q6ma-0004-rb04-h6en1roa"
@@ -108,9 +108,9 @@ impl Into<opentelemetry::trace::TraceId> for TxId {
     // - least significative 8 bytes. Totally random.
     //
     // We want the most entropic slice of 16 bytes that's deterministicly determined
-    fn into(self) -> opentelemetry::trace::TraceId {
+    fn from(id: TxId) -> Self {
         let mut buffer = [0; 16];
-        let tx_id_bytes = self.0.as_bytes();
+        let tx_id_bytes = id.0.as_bytes();
         let len = tx_id_bytes.len();
 
         // bytes [len-20  to len-12): least significative 4 bytes of the timestamp + 4 bytes counter
