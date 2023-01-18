@@ -335,7 +335,7 @@ async fn transaction_commit_handler(
         capturer.start_capturing().await;
     }
 
-    let result = state.cx.executor.rollback_tx(tx_id).await;
+    let result = state.cx.executor.commit_tx(tx_id).await;
 
     let telemetry = if let telemetry::capturing::Capturer::Enabled(capturer) = capture_config {
         capturer.fetch_captures().await
