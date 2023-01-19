@@ -36,7 +36,7 @@ pub fn set_parent_context_from_json_str(span: &Span, trace: &str) -> Option<Stri
     trace_id
 }
 
-pub fn set_span_link_from_trace_id(span: &Span, trace_id: Option<String>) {
+pub fn set_span_link_from_traceparent(span: &Span, traceparent: Option<String>) {
     if let Some(traceparent) = traceparent {
         let trace: HashMap<String, String> = HashMap::from([("traceparent".to_string(), traceparent)]);
         let cx = opentelemetry::global::get_text_map_propagator(|propagator| propagator.extract(&trace));

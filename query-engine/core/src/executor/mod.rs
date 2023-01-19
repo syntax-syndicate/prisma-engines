@@ -67,13 +67,10 @@ pub struct TransactionOptions {
     /// Isolation level to use for the transaction.
     pub isolation_level: Option<String>,
 
-    /// An optional pre-defined transaction id. Some value might be provided in case we want a specific
-    /// id for the transaction. This is useful for clients of the transaction manager to be able to
-    /// capture telemetry data for the transaction. A synthetic "traceparent" is created for the whole
-    /// transaction, and derived consistenly derived from the predefined_id, in case no traceparent is
-    /// provided via headers
+    /// An optional pre-defined transaction id. Some value might be provided in case we want to generate
+    /// a new id at the beginning of the transaction
     #[serde(default)]
-    pub predefined_id: Option<String>,
+    pub new_tx_id: Option<String>,
 }
 
 impl TransactionOptions {
@@ -82,15 +79,15 @@ impl TransactionOptions {
             max_acquisition_millis,
             valid_for_millis,
             isolation_level,
-            predefined_id: None,
+            new_tx_id: None,
         }
     }
 
     /// Generates a new transaction id before the transaction is started and returns a modified version
     /// of self with the new predefined_id set.
-    pub fn with_predefined_transaction_id(&mut self) -> TxId {
+    pub fn with_new_transaction_id(&mut self) -> TxId {
         let tx_id: TxId = Default::default();
-        self.predefined_id = Some(tx_id.to_string());
+        self.new_tx_id = Some(tx_id.to_string());
         tx_id
     }
 }

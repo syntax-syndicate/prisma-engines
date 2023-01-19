@@ -145,11 +145,7 @@ where
 {
     async fn start_tx(&self, query_schema: QuerySchemaRef, tx_opts: &TransactionOptions) -> crate::Result<TxId> {
         super::with_request_now(async move {
-            let id = if let Some(id_str) = tx_opts.predefined_id.clone() {
-                id_str.into()
-            } else {
-                TxId::default()
-            };
+            let id: TxId = tx_opts.new_tx_id.clone().unwrap().into();
             trace!("[{}] Starting...", id);
             let conn_span = info_span!(
                 "prisma:engine:connection",

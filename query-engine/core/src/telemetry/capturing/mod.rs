@@ -120,6 +120,8 @@
 //!     blob **[15]**.
 //!  
 pub use self::capturer::Capturer;
+pub use self::settings::Settings;
+
 use self::capturer::Exporter;
 use self::capturer::SyncedSpanProcessor;
 use once_cell::sync::Lazy;
@@ -131,7 +133,7 @@ static TRACER: Lazy<sdk::trace::Tracer> = Lazy::new(setup_and_install_tracer_glo
 
 /// Creates a new capturer, which is configured to export traces and log events happening during a
 /// particular request
-pub fn capturer(trace_id: trace::TraceId, settings: &str) -> Capturer {
+pub fn capturer(trace_id: trace::TraceId, settings: Settings) -> Capturer {
     Capturer::new(EXPORTER.to_owned(), trace_id, settings.into())
 }
 

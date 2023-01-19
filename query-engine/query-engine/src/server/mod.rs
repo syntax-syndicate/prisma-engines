@@ -2,7 +2,7 @@ use crate::state::State;
 use crate::{opt::PrismaOpt, PrismaResult};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{header::CONTENT_TYPE, Body, HeaderMap, Method, Request, Response, Server, StatusCode};
-use opentelemetry::trace::{SpanId, TraceContextExt, TraceId};
+use opentelemetry::trace::TraceContextExt;
 use opentelemetry::{global, propagation::Extractor};
 use query_core::{
     schema::QuerySchemaRenderer, telemetry, ExtendedTransactionUserFacingError, TransactionOptions, TxId,
@@ -114,16 +114,36 @@ async fn graphql_handler(state: State, req: Request<Body>) -> Result<Response<Bo
         return Ok(handle_debug_headers(&req));
     }
 
-    let ServerExecutionContext {
-        span,
-        tx_id,
-        capture_config,
-        trace_id,
-    } = ServerExecutionContext::builder(req.headers())
-        .with_span(info_span!("prisma:engine", user_facing = true))
-        .build();
+    let headers = req.headers();
+    let span = info_span!("prisma:engine", user_facing = true);
 
-    if let telemetry::capturing::Capturer::Enabled(capturer) = capture_config.clone() {
+    let capture_settings = capture_settings(headers);
+    let mut traceparent = traceparent(headers);
+    let tx_id = transaction_id(headers);
+
+    // When log capturing (and not tracing capturing) is enabled in the scope of an interactive
+    // transaction the client won't send a traceparent header.
+    //
+    // In this scenario, we cannot correlate logs for queries happening within an iTX with a trace_id
+    // of such transaction, because no one is sending that trace id information through the
+    // traceparent header, which is the propagation mechanism.
+    //
+    // Fortunately, we can derive an artificial trace_id, when the client is interested in
+    // capturing logs and not traces, for all the queries happening within that transaction. We do
+    // that by deriving a trace_id (and consequently a traceparent and a telemetry Context)
+    // from a tx_id
+    if capture_settings.logs_enabled() && traceparent.is_none() && tx_id.is_some() {
+        let tx_id = tx_id.clone().unwrap();
+        traceparent = Some(tx_id.as_traceparent());
+        span.set_parent(tx_id.into())
+    } else if tx_id.is_none() {
+        span.set_parent(get_parent_span_context(headers))
+    }
+
+    let trace_id = span.context().span().span_context().trace_id();
+    let capture_config = telemetry::capturing::capturer(trace_id, capture_settings);
+
+    if let telemetry::capturing::Capturer::Enabled(capturer) = &capture_config {
         capturer.start_capturing().await;
     }
 
@@ -135,12 +155,9 @@ async fn graphql_handler(state: State, req: Request<Body>) -> Result<Response<Bo
         match serde_json::from_slice(full_body.as_ref()) {
             Ok(body) => {
                 let handler = GraphQlHandler::new(&*state.cx.executor, state.cx.query_schema());
-                let mut result = handler
-                    .handle(body, tx_id, Some(trace_id.to_string()))
-                    .instrument(span)
-                    .await;
+                let mut result = handler.handle(body, tx_id, traceparent).instrument(span).await;
 
-                if let telemetry::capturing::Capturer::Enabled(capturer) = capture_config {
+                if let telemetry::capturing::Capturer::Enabled(capturer) = &capture_config {
                     let telemetry = capturer.fetch_captures().await;
                     if let Some(telemetry) = telemetry {
                         result.set_extension("traces".to_owned(), json!(telemetry.traces));
@@ -238,17 +255,22 @@ async fn metrics_handler(state: State, req: Request<Body>) -> Result<Response<Bo
 async fn transaction_handler(state: State, req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
     let path = req.uri().path().to_owned();
     let sections: Vec<&str> = path.split('/').collect();
+    let span = info_span!("prisma:engine:itx_runner", user_facing = true, itx_id = field::Empty);
 
     if sections.len() == 3 && sections[2] == "start" {
-        return transaction_start_handler(state, req).await;
+        return transaction_start_handler(state, req).instrument(span).await;
     }
 
     if sections.len() == 4 && sections[3] == "commit" {
-        return transaction_commit_handler(state, req, sections[2].into()).await;
+        return transaction_commit_handler(state, req, sections[2].into())
+            .instrument(span)
+            .await;
     }
 
     if sections.len() == 4 && sections[3] == "rollback" {
-        return transaction_rollback_handler(state, req, sections[2].into()).await;
+        return transaction_rollback_handler(state, req, sections[2].into())
+            .instrument(span)
+            .await;
     }
 
     let res = Response::builder()
@@ -265,22 +287,11 @@ async fn transaction_start_handler(state: State, req: Request<Body>) -> Result<R
     // block and buffer request until the request has completed
     let full_body = hyper::body::to_bytes(body_start).await?;
     let mut tx_opts: TransactionOptions = serde_json::from_slice(full_body.as_ref()).unwrap();
+    let tx_id = tx_opts.with_new_transaction_id();
 
-    let ServerExecutionContext {
-        tx_id: _,
-        span,
-        trace_id: _,
-        capture_config,
-    } = ServerExecutionContext::builder(&headers)
-        .with_span(info_span!(
-            "prisma:engine:itx_runner",
-            user_facing = true,
-            itx_id = field::Empty
-        ))
-        .with_tx_id(tx_opts.with_predefined_transaction_id())
-        .build();
+    let capture_config = capture_config(&headers, tx_id.clone());
 
-    if let telemetry::capturing::Capturer::Enabled(capturer) = capture_config.clone() {
+    if let telemetry::capturing::Capturer::Enabled(capturer) = &capture_config {
         capturer.start_capturing().await;
     }
 
@@ -288,10 +299,10 @@ async fn transaction_start_handler(state: State, req: Request<Body>) -> Result<R
         .cx
         .executor
         .start_tx(state.cx.query_schema().clone(), &tx_opts)
-        .instrument(span)
+        .instrument(Span::current())
         .await;
 
-    let telemetry = if let telemetry::capturing::Capturer::Enabled(capturer) = capture_config {
+    let telemetry = if let telemetry::capturing::Capturer::Enabled(capturer) = &capture_config {
         capturer.fetch_captures().await
     } else {
         None
@@ -322,22 +333,15 @@ async fn transaction_commit_handler(
     req: Request<Body>,
     tx_id: TxId,
 ) -> Result<Response<Body>, hyper::Error> {
-    let ServerExecutionContext {
-        tx_id: _,
-        span: _,
-        trace_id: _,
-        capture_config,
-    } = ServerExecutionContext::builder(req.headers())
-        .with_tx_id(tx_id.clone())
-        .build();
+    let capture_config = capture_config(req.headers(), tx_id.clone());
 
-    if let telemetry::capturing::Capturer::Enabled(capturer) = capture_config.clone() {
+    if let telemetry::capturing::Capturer::Enabled(capturer) = &capture_config {
         capturer.start_capturing().await;
     }
 
     let result = state.cx.executor.commit_tx(tx_id).await;
 
-    let telemetry = if let telemetry::capturing::Capturer::Enabled(capturer) = capture_config {
+    let telemetry = if let telemetry::capturing::Capturer::Enabled(capturer) = &capture_config {
         capturer.fetch_captures().await
     } else {
         None
@@ -354,44 +358,22 @@ async fn transaction_rollback_handler(
     req: Request<Body>,
     tx_id: TxId,
 ) -> Result<Response<Body>, hyper::Error> {
-    let ServerExecutionContext {
-        tx_id: _,
-        span: _,
-        trace_id: _,
-        capture_config,
-    } = ServerExecutionContext::builder(req.headers())
-        .with_tx_id(tx_id.clone())
-        .build();
+    let capture_config = capture_config(req.headers(), tx_id.clone());
 
-    if let telemetry::capturing::Capturer::Enabled(capturer) = capture_config.clone() {
+    if let telemetry::capturing::Capturer::Enabled(capturer) = &capture_config {
         capturer.start_capturing().await;
     }
 
     let result = state.cx.executor.rollback_tx(tx_id).await;
 
-    let telemetry = if let telemetry::capturing::Capturer::Enabled(capturer) = capture_config {
+    let telemetry = if let telemetry::capturing::Capturer::Enabled(capturer) = &capture_config {
         capturer.fetch_captures().await
     } else {
         None
     };
 
     match result {
-        Ok(_) => {
-            let result = if let Some(telemetry) = telemetry {
-                json!({ "extensions": { "logs": json!(telemetry.logs), "traces": json!(telemetry.traces) } })
-            } else {
-                json!({})
-            };
-            let result_bytes = serde_json::to_vec(&result).unwrap();
-
-            let res = Response::builder()
-                .status(StatusCode::OK)
-                .header(CONTENT_TYPE, "application/json")
-                .body(Body::from(result_bytes))
-                .unwrap();
-
-            Ok(res)
-        }
+        Ok(_) => Ok(empty_json_to_http_resp(telemetry)),
         Err(err) => Ok(err_to_http_resp(err, telemetry)),
     }
 }
@@ -472,91 +454,57 @@ fn err_to_http_resp(
     Response::builder().status(status).body(body).unwrap()
 }
 
-/// Encapsulates the data relevant to tweak the execution of a query, particularly, its
-/// tracing configuration, and transaction scope.
-struct ServerExecutionContext {
-    pub(crate) tx_id: Option<TxId>,
-    pub(crate) span: Span,
-    pub(crate) trace_id: TraceId,
-    pub(crate) capture_config: telemetry::capturing::Capturer,
+fn capture_config(headers: &HeaderMap, tx_id: TxId) -> telemetry::capturing::Capturer {
+    let span = Span::current();
+    let capture_settings = capture_settings(headers);
+    let traceparent = traceparent(headers);
+
+    if traceparent.is_none() && capture_settings.is_enabled() {
+        span.set_parent(tx_id.clone().into())
+    } else {
+        span.set_parent(get_parent_span_context(headers))
+    }
+
+    let trace_id = span.context().span().span_context().trace_id();
+    telemetry::capturing::capturer(trace_id, capture_settings)
 }
 
-impl ServerExecutionContext {
-    pub(crate) fn builder(headers: &HeaderMap) -> ServerExecutionContextBuilder {
-        ServerExecutionContextBuilder {
-            headers,
-            root_span: None,
-            tx_id: None,
-        }
+fn capture_settings(headers: &HeaderMap) -> telemetry::capturing::Settings {
+    const TRACE_CAPTURE_HEADER: &str = "X-capture-telemetry";
+    headers
+        .get(TRACE_CAPTURE_HEADER)
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| Some(s.into()))
+        .unwrap()
+}
+
+fn traceparent(headers: &HeaderMap) -> Option<String> {
+    const TRACEPARENT_HEADER: &str = "traceparent";
+
+    let value = headers
+        .get(TRACEPARENT_HEADER)
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| Some(s.to_owned()));
+
+    let is_valid_traceparent = |s: &String| s.split_terminator('-').collect::<Vec<&str>>().len() >= 4;
+
+    match &value {
+        Some(str) if is_valid_traceparent(str) => value,
+        _ => None,
     }
 }
 
-struct ServerExecutionContextBuilder<'req> {
-    headers: &'req HeaderMap,
-    root_span: Option<Span>,
-    tx_id: Option<TxId>,
+fn transaction_id(headers: &HeaderMap) -> Option<TxId> {
+    const TRANSACTION_ID_HEADER: &str = "X-transaction-id";
+    headers
+        .get(TRANSACTION_ID_HEADER)
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| Some(TxId::from(s)))
 }
 
-impl ServerExecutionContextBuilder<'_> {
-    pub(crate) fn with_tx_id(mut self, tx_id: TxId) -> Self {
-        self.tx_id = Some(tx_id);
-        self
-    }
-
-    pub(crate) fn with_span(mut self, span: Span) -> Self {
-        self.root_span = Some(span);
-        self
-    }
-
-    pub(crate) fn build(self) -> ServerExecutionContext {
-        const TRACE_CAPTURE_HEADER: &str = "X-capture-telemetry";
-        const TRANSACTION_ID_HEADER: &str = "X-transaction-id";
-
-        // TxId. Either set explicitly or inferred from the header or
-        let tx_id = if self.tx_id.is_some() {
-            self.tx_id
-        } else if let Some(id_header) = self.headers.get(TRANSACTION_ID_HEADER) {
-            let msg = format!("{} has not been correctly set.", TRANSACTION_ID_HEADER);
-            let id = id_header.to_str().unwrap_or(msg.as_str());
-            Some(TxId::from(id))
-        } else {
-            None
-        };
-
-        // Span. Either set explicitly or default to current
-        let span = if let Some(span) = self.root_span {
-            span
-        } else {
-            Span::current()
-        };
-
-        // Parent tracing context, either propagated in the headers, or if not propagated and
-        // in the scope of a transaction, inferred from its id.
-        let extractor = HeaderExtractor(self.headers);
-        let context = global::get_text_map_propagator(|propagator| propagator.extract(&extractor));
-
-        let parent_trace_id = context.span().span_context().trace_id();
-        let parent_span_id = context.span().span_context().span_id();
-        if parent_trace_id != TraceId::INVALID && parent_span_id != SpanId::INVALID {
-            span.set_parent(context);
-        } else if let Some(tx_id) = tx_id.clone() {
-            span.set_parent(tx_id.into());
-        };
-
-        // Capturing, configured in a header
-        let settings = if let Some(h) = self.headers.get(TRACE_CAPTURE_HEADER) {
-            h.to_str().unwrap_or("")
-        } else {
-            ""
-        };
-        let trace_id = span.context().span().span_context().trace_id();
-        let capture_config = telemetry::capturing::capturer(trace_id, settings);
-
-        ServerExecutionContext {
-            tx_id,
-            span,
-            trace_id,
-            capture_config,
-        }
-    }
+/// If the client sends us a trace and span id, extracting a new context if the
+/// headers are set. If not, returns current context.
+fn get_parent_span_context(headers: &HeaderMap) -> opentelemetry::Context {
+    let extractor = HeaderExtractor(headers);
+    global::get_text_map_propagator(|propagator| propagator.extract(&extractor))
 }

@@ -53,7 +53,7 @@ impl From<&str> for Settings {
 
 impl Settings {
     #[inline(always)]
-    pub(super) fn is_enabled(&self) -> bool {
+    pub fn is_enabled(&self) -> bool {
         self.traces_enabled() || self.logs_enabled()
     }
 
