@@ -85,14 +85,19 @@ impl From<TxId> for opentelemetry::Context {
     // impossible to capture traces happening in the individual queries, as they won't be aware of
     // the transaction they are part of.
     //
-    // By generating this "fake" traceparent based on the transaction id, we can have a common trace_id
-    // for all transaction operations.
+    // By generating this "fake" traceparent based on the transaction id, we can have a common
+    // trace_id for all transaction operations.
     fn from(id: TxId) -> Self {
-        let trace_id: opentelemetry::trace::TraceId = id.into();
-        let traceparent = format!("00-{}-0000000000000001-01", trace_id);
-
-        let extractor: HashMap<String, String> = HashMap::from_iter(vec![("traceparent".to_string(), traceparent)]);
+        let extractor: HashMap<String, String> =
+            HashMap::from_iter(vec![("traceparent".to_string(), id.as_traceparent())]);
         opentelemetry::global::get_text_map_propagator(|propagator| propagator.extract(&extractor))
+    }
+}
+
+impl TxId {
+    pub fn as_traceparent(&self) -> String {
+        let trace_id = opentelemetry::trace::TraceId::from(self.clone());
+        format!("00-{}-0000000000000001-01", trace_id)
     }
 }
 
