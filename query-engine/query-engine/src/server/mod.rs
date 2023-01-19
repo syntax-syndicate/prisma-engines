@@ -471,12 +471,14 @@ fn capture_config(headers: &HeaderMap, tx_id: TxId) -> telemetry::capturing::Cap
 
 #[allow(clippy::bind_instead_of_map)]
 fn capture_settings(headers: &HeaderMap) -> telemetry::capturing::Settings {
-    const TRACE_CAPTURE_HEADER: &str = "X-capture-telemetry";
-    headers
-        .get(TRACE_CAPTURE_HEADER)
-        .and_then(|h| h.to_str().ok())
-        .and_then(|s| Some(s.into()))
-        .unwrap()
+    const CAPTURE_TELEMETRY_HEADER: &str = "X-capture-telemetry";
+    let s = if let Some(hv) = headers.get(CAPTURE_TELEMETRY_HEADER) {
+        hv.to_str().unwrap_or("")
+    } else {
+        ""
+    };
+
+    telemetry::capturing::Settings::from(s)
 }
 
 fn traceparent(headers: &HeaderMap) -> Option<String> {
