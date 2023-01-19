@@ -4,75 +4,79 @@
 //! The interaction diagram below (soorry width!) shows the different roles at play during telemetry
 //! capturing. A textual explanatation follows it. For the sake of example a server environment
 //! --the query-engine crate-- is assumed.
-//! #
-//! #
-//! #                                                              ╔═══════════════════════╗ ╔═══════════════╗ ╔═══════════════════════╗                                                           
-//! #                                                              ║<<SpanExporter, Sync>> ║ ║    Storage    ║ ║<<SpanProcessor, Sync>>║ ╔═══════════════════╗                                     
-//! #         ┌───────────────────┐                                ║       EXPORTER        ║ ║               ║ ║       PROCESSOR       ║ ║      TRACER       ║                                     
-//! #         │      Server       │                                ╚═══════════╦═══════════╝ ╚═══════╦═══════╝ ╚═══════════╦═══════════╝ ╚═════════╦═════════╝                                     
-//! #         └─────────┬─────────┘                                            │                     │                     │                       │                                               
-//! #                   │                                                      │                     │                     │                       │                                               
-//! #                   │                                                      │                     │                     │                       │                                               
-//! #         POST      │                                                      │                     │                     │                       │                                               
-//! #    (body, headers)│                                                      │                     │                     │                       │                                               
-//! #       ──────────▶┌┴┐                                                     │                     │                     │                       │                                               
-//! #          [1]     │ │new(headers)╔════════════╗                           │                     │                     │                       │                                               
-//! #                  │ ├───────────▶║s: Settings ║                           │                     │                     │                       │                                               
-//! #                  │ │    [2]     ╚════════════╝                           │                     │                     │                       │                                               
-//! #                  │ │                                                     │                     │                     │                       │                                               
-//! #                  │ │                    ╔═══════════════════╗            │                     │                     │                       │                                               
-//! #                  │ │                    ║ Capturer::Enabled ║            │                     │                     │                       │             ┌────────────┐                    
-//! #                  │ │                    ╚═══════════════════╝            │                     │                     │                       │             │<<Somewhere>│                    
-//! #                  │ │                              │                      │                     │                     │                       │             └──────┬─────┘                    
-//! #                  │ │        new(trace_id, s)      │                      │                     │                     │                       │                    │                          
-//! #                  │ ├─────────────────────────────▶│                      │                     │                     │                       │                    │                          
-//! #                  │ │           [2]                │                      │                     │                     │                       │                    │                          
-//! #                  │ │                              │                      │                     │                     │                       │                    │                          
-//! #                  │ │       start_capturing()      │                      │                     │                     │                       │                    │                          
-//! #                  │ ├─────────────────────────────▶│                      │                     │                     │                       │                    │                          
-//! #                  │ │            [3]               │                      │                     │                     │                       │                    │                          
-//! #                  │ │                              │    start_capturing   │                     │                     │                       │                    │                          
-//! #                  │ │                              │     (trace_id, s)    │                     │                     │                       │                    │                          
-//! #                  │ │                              ├─────────────────────▶│ insert(trace_id, s) │                     │                       │                    │                          
-//! #                  │ │                              │                      ├────────────────────▶│                     │                       │                    │                          
-//! #                  │ │                              │                      │        [4]          │                     │                       │                    │                          
-//! #                  │ │                              │                      │                     │                     │                       │  process_query     │                          
-//! #                  │ │──────────────────────────────┼──────────────────────┼─────────────────────┼─────────────────────┼───────────────────────┼──────────────────▶┌┴┐                         
-//! #                  │ │                              │                      │                     │                     │                       │       [5]         │ │                         
-//! #                  │ │                              │                      │                     │                     │                       │                   │ │                         
-//! #                  │ │                              │                      │                     │                     │                       │     log! / span!  │ │  ┌─────────────────────┐
-//! #                  │ │                              │                      │                     │                     │   on_start / on_end   ◀───────────────────│ │  │ res: PrismaResponse │
-//! #                  │ │                              │                      │                     │                     │◀──────────────────────┤       [6]         │ │  └──────────┬──────────┘
-//! #                  │ │                              │                      │      export(Vec<Span>) [8]                │        [7]            │                   │ │   new       │           
-//! #                  │ │                              │                      │◀────────────────────┼─────────────────────│                       │                   │ │────────────▶│           
-//! #                  │ │                              │                      │                     │                     │                       │                   │ │             │           
-//! #                  │ │                              │                      │   append(trace_id,  │                     │                       │                   │ │             │           
-//! #                  │ │                              │                      │     logs, traces)   │                     │                       │                   │ │             │           
-//! #                  │ │                              │                      ├────────────────────▶│                     │                       │                   │ │             │           
-//! #                  │ │                              │                      │        [9]          │                     │                       │                   │ │             │           
-//! #                  │ │      res: PrismaResponse [10]│                      │                     │                     │                       │                   │ │             │           
-//! #                  │ │◁ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┼ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│─ ─ ─ ─ ─ ─ ─ ─ ─ ─└┬┘             │           
-//! #                  │ │        fetch_captures()      │                      │                     │                     │                       │                    │              │           
-//! #                  │ ├─────────────────────────────▶│      fetch_captures  │                     │                     │                       │                    │              │           
-//! #                  │ │             [11]             │        (trace_id)    │                     │                     │                       │                    │              │           
-//! #                  │ │                              ├─────────────────────▶│                     │   Flush()[12]       │                       │                    x              │           
-//! #                  │ │                              │                      ├─────────────────────┼────────────────────▶│                       │                                   │           
-//! #                  │ │                              │                      │                     │                     │                       │                                   │           
-//! #                  │ │                              │                      │        export(pending: Vec<Span>)         │                       │                                   │           
-//! #                  │ │                              │                      │◀────────────────────┼─────────────────────│                       │                                   │           
-//! #                  │ │                              │                      │                     │                     │                       │                                   │           
-//! #                  │ │                              │                    get logs/traces for trace_id                  │                       │                                   │           
-//! #                  │ │                              │                      ├────────────────────▶│                     │                       │                                   │           
-//! #                  │ │                              ◁ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│      [13]           │                     │                       │                                   │           
-//! #                  │ │◁─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│                      │                     │                     │                       │                                   │           
-//! #                  │ │          logs, traces        x                      │                     │                     │                       │        res.set_extension(logs)    │           
-//! #                  │ ├─────────────────────────────────────────────────────┼─────────────────────┼─────────────────────┼───────────────────────┼─[14]─────────────────────────────▶│           
-//! #                  │ │                                                     │                     │                     │                       │        res.set_extension(traces)  │           
-//! #                  │ ├─────────────────────────────────────────────────────┼─────────────────────┼─────────────────────┼───────────────────────┼──────────────────────────────────▶│           
-//! #           ◀ ─ ─ ─└┬┘                                                     │                     │                     │                       │                                   x           
-//! #        json!(res)                                                                                                                                                                           
-//! #          [15]                                                                                                                                                                                                                                                                                                                                                          
-//! #                                                                                                                                                                                                         
+//! #                                                           ╔═══════════════════════╗     ╔═══════════════╗                                                                     
+//! #                                                           ║<<SpanProcessor, Sync>>║     ║    Storage    ║   ╔═══════════════════╗                                             
+//! #      ┌───────────────────┐                                ║       PROCESSOR       ║     ║               ║   ║      TRACER       ║                                             
+//! #      │      Server       │                                ╚═══════════╦═══════════╝     ╚═══════╦═══════╝   ╚═════════╦═════════╝                                             
+//! #      └─────────┬─────────┘                                            │                         │                     │                                                       
+//! #                │                                                      │                         │                     │                                                       
+//! #                │                                                      │                         │                     │                                                       
+//! #      POST      │                                                      │                         │                     │                                                       
+//! # (body, headers)│                                                      │                         │                     │                                                       
+//! #    ──────────▶┌┴┐                                                     │                         │                     │                                                       
+//! #        ┌─┐    │ │new(headers)╔════════════╗                           │                         │                     │                                                       
+//! #        │1│    │ ├───────────▶║s: Settings ║                           │                         │                     │                                                       
+//! #        └─┘    │ │            ╚════════════╝                           │                         │                     │                                                       
+//! #               │ │                                                     │                         │                     │                                                       
+//! #               │ │                    ╔═══════════════════╗            │                         │                     │                                                       
+//! #               │ │                    ║ Capturer::Enabled ║            │                         │                     │                     ┌────────────┐                    
+//! #               │ │                    ╚═══════════════════╝            │                         │                     │                     │<<Somewhere>│                    
+//! #               │ │                              │                      │                         │                     │                     └──────┬─────┘                    
+//! #               │ │   ┌─┐  new(trace_id, s)      │                      │                         │                     │                            │                          
+//! #               │ ├───┤2├───────────────────────▶│                      │                         │                     │                            │                          
+//! #               │ │   └─┘                        │                      │                         │                     │                            │                          
+//! #               │ │                              │                      │                         │                     │                            │                          
+//! #               │ │   ┌─┐ start_capturing()      │   start_capturing    │                         │                     │                            │                          
+//! #               │ ├───┤3├───────────────────────▶│    (trace_id, s)     │                         │                     │                            │                          
+//! #               │ │   └─┘                        │                      │                         │                     │                            │                          
+//! #               │ │                              ├─────────────────────▶│                         │                     │                            │                          
+//! #               │ │                              │                      │                         │                     │                            │                          
+//! #               │ │                              │                      │ ┌─┐insert(trace_id, s)  │                     │                            │                          
+//! #               │ │                              │                      ├─┤4├────────────────────▶│                     │                            │                          
+//! #               │ │                              │                      │ └─┘                     │                     │                            │                          
+//! #               │ │                              │                      │                         │            ┌─┐      │          process_query     │                          
+//! #               │ ├──────────────────────────────┼──────────────────────┼─────────────────────────┼────────────┤5├──────┼──────────────────────────▶┌┴┐                         
+//! #               │ │                              │                      │                         │            └─┘      │                           │ │                         
+//! #               │ │                              │                      │                         │                     │                           │ │                         
+//! #               │ │                              │                      │                         │                     │                           │ │  ┌─────────────────────┐
+//! #               │ │                              │                      │                         │                     │     log! / span!     ┌─┐  │ │  │ res: PrismaResponse │
+//! #               │ │                              │                      │                         │                     │◀─────────────────────┤6├──│ │  └──────────┬──────────┘
+//! #               │ │                              │                      │        on_end(span_data)│            ┌─┐      │                      └─┘  │ │   new       │           
+//! #               │ │                              │                      │◀────────────────────────┼────────────┤7├──────┤                           │ │────────────▶│           
+//! #               │ │                              │                      │                         │            └─┘      │                           │ │             │           
+//! #               │ │                              │                      │  append(trace_id, logs, │                     │                           │ │             │           
+//! #               │ │                              │                      │  ┌─┐     traces)        │                     │                           │ │             │           
+//! #               │ │                              │                      ├──┤8├───────────────────▶│                     │                           │ │             │           
+//! #               │ │                              │                      │  └─┘                    │                     │                           │ │             │           
+//! #               │ │      res: PrismaResponse     │     ┌─┐              │                         │                     │                           │ │             │           
+//! #               │ │◁ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┼ ─ ─ ┤9├ ─ ─ ─ ─ ─ ─ ─│─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─└┬┘             │           
+//! #               │ │ ┌────┐ fetch_captures()      │     └─┘              │                         │                     │                            │              │           
+//! #               │ ├─┤ 10 ├──────────────────────▶│      fetch_captures  │                         │                     │                            │              │           
+//! #               │ │ └────┘                       │        (trace_id)    │                         │                     │                            │              │           
+//! #               │ │                              ├─────────────────────▶│                         │                     │                            x              │           
+//! #               │ │                              │                      │                         │                     │                                           │           
+//! #               │ │                              │                      │┌────┐  get logs/traces  │                     │                                           │           
+//! #               │ │                              │                      ├┤ 11 ├───────────────────▶                     │                                           │           
+//! #               │ │                              │                      │└────┘                   │                     │                                           │           
+//! #               │ │                              │                      │◁ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│                     │                                           │           
+//! #               │ │                              │                      │                         │                     │                                           │           
+//! #               │ │                              ◁ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│                         │                     │                                           │           
+//! #               │ │          logs, traces        │                      │                         │                     │                                           │           
+//! #               │ │◁─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│                      │                         │                     │                                           │           
+//! #               │ │                              x        ┌────┐        │                         │                     │                res.set_extension(logs)    │           
+//! #               │ ├───────────────────────────────────────┤ 12 ├────────┼─────────────────────────┼─────────────────────┼──────────────────────────────────────────▶│           
+//! #               │ │                                       └────┘        │                         │                     │                res.set_extension(traces)  │           
+//! #               │ ├─────────────────────────────────────────────────────┼─────────────────────────┼─────────────────────┼──────────────────────────────────────────▶│           
+//! #        ◀ ─ ─ ─└┬┘                                                     │                         │                     │                                           x           
+//! #     json!(res) │                                                                                                                                                              
+//! #        ┌────┐  │                                                                                                                                                              
+//! #        │ 13 │  │                                                                                                                                                              
+//! #        └────┘                                                                                                                                                                 
+//! #                                                                                                                                                                               
+//! #                                                                          ◁─ ─ ─ ─ return                                                                                      
+//! #                                                                                                                                                                               
+//! #                                                                          ◁─────── call (pseudo-signatures)                                                                    
+//! #                                                                                                                                                                                                                                                                                                                                                         
 //!  
 //!  In the diagram, you will see objects whose lifetime is static. The boxes for those have a double
 //!  width margin. These are:
@@ -80,7 +84,7 @@
 //!    - The `server` itself
 //!    - The  global `TRACER`, which handles `log!` and `span!` and uses the global `PROCESSOR` to
 //!     process the data constituting a trace `Span`s and log `Event`s
-//!    - The global `EXPORTER`, which manages the `Storage` set of data structures, holding logs,
+//!    - The global `PROCESSOR`, which manages the `Storage` set of data structures, holding logs,
 //!     traces (and capture settings) per request.
 //!  
 //!  Then, through the request lifecycle, different objects are created and dropped:
@@ -102,45 +106,35 @@
 //!     creating for the `trace_id` in two different data structures: `logs` and `traces`; and storing
 //!     the settings for selecting the Spans and Event to capture **[4]**.
 //!    - The server dispatches the request and _Somewhere_ else in the code, it is processed **[5]**.
-//!    - There the code logs events and emits traces asynchronously, as part of processing **[6]**
+//!    - There the code logs events and emits traces asynchronously, as part of the processing **[6]**
 //!    - Traces and Logs arrive at the `TRACER`, and get hydrated in the `PROCESSOR` **[7]**,
-//!     and exported in batches by the `EXPORTER`**[8]** which writes them in the shard corresponding to
-//!     the current `trace_id`, into the `logs` and `traces` storage **[9]**. The settings previously
-//!     stored `trace_id` is used to pick which events and spans are going to be captured based on
-//!     their level.
+//!     which writes them in the shard corresponding to the current `trace_id`, into the
+//!     `logs` and `traces` storage **[8]**. The settings previously stored under the `trace_id`
+//!     key, are used to pick which events and spans are going to be captured based on their level.
 //!    - When the code that dispatches the request is done it returns a `PrismaResponse` to the
-//!     server **[10]**.
-//!    - Then the server asks the `Exporter` to fetch the captures **[11]**
-//!    - The `Exporter` tells the `PROCESSOR` to flush any pending `Span`s and `Event`s **[12]**
-//!    - And right after that, it fetches the captures from the `Storage` **[13]**. At that time, although
+//!     server **[9]**.
+//!    - Then the server asks the `PROCESSOR` to fetch the captures **[10]**
+//!    - And right after that, it fetches the captures from the `Storage` **[11]**. At that time, although
 //!     that's not represented in the diagram, the captures are deleted from the storage, thus
 //!     freeing any memory used for capturing during the request
-//!    - Finally, the server sets the `logs` and `traces` extensions in the `PrismaResponse`**[14]**,
+//!    - Finally, the server sets the `logs` and `traces` extensions in the `PrismaResponse`**[12]**,
 //!     it serializes the extended response in json format and returns it as an HTTP Response
-//!     blob **[15]**.
+//!     blob **[13]**.
 //!  
 pub use self::capturer::Capturer;
 pub use self::settings::Settings;
 
-use self::capturer::Exporter;
-use self::capturer::SyncedSpanProcessor;
+use self::capturer::Processor;
 use once_cell::sync::Lazy;
 use opentelemetry::{global, sdk, trace};
 
-static EXPORTER: Lazy<capturer::Exporter> = Lazy::new(Exporter::default);
-static PROCESSOR: Lazy<SyncedSpanProcessor> = Lazy::new(|| SyncedSpanProcessor::new(EXPORTER.to_owned()));
+static PROCESSOR: Lazy<capturer::Processor> = Lazy::new(Processor::default);
 static TRACER: Lazy<sdk::trace::Tracer> = Lazy::new(setup_and_install_tracer_globally);
 
 /// Creates a new capturer, which is configured to export traces and log events happening during a
 /// particular request
 pub fn capturer(trace_id: trace::TraceId, settings: Settings) -> Capturer {
-    Capturer::new(EXPORTER.to_owned(), trace_id, settings)
-}
-
-/// Returns a clone of the global processor used by the tracer and used for deterministic flushing
-/// of the spans that are pending to be processed after a request finishes.
-pub(self) fn processor() -> SyncedSpanProcessor {
-    PROCESSOR.to_owned()
+    Capturer::new(PROCESSOR.to_owned(), trace_id, settings)
 }
 
 /// Returns a clone to the global tracer used when capturing telemetry in the response
@@ -153,7 +147,7 @@ pub fn tracer() -> &'static sdk::trace::Tracer {
 fn setup_and_install_tracer_globally() -> sdk::trace::Tracer {
     global::set_text_map_propagator(sdk::propagation::TraceContextPropagator::new());
 
-    let provider_builder = sdk::trace::TracerProvider::builder().with_span_processor(processor());
+    let provider_builder = sdk::trace::TracerProvider::builder().with_span_processor(PROCESSOR.to_owned());
     let provider = provider_builder.build();
     let tracer = opentelemetry::trace::TracerProvider::tracer(&provider, "opentelemetry");
 

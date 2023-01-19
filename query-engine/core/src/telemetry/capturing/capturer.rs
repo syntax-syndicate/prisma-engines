@@ -1,14 +1,13 @@
 use super::{settings::Settings, storage::Storage};
 use crate::models;
-use async_trait::async_trait;
 use opentelemetry::{
     sdk::{
-        export::trace::{ExportResult, SpanData, SpanExporter},
-        trace::{BatchSpanProcessor, Span, SpanProcessor},
+        export::trace::SpanData,
+        trace::{Span, SpanProcessor},
     },
     trace::{TraceId, TraceResult},
 };
-use std::{borrow::Cow, fmt, time::Duration};
+use std::{borrow::Cow, fmt};
 use std::{collections::HashMap, sync::Arc, sync::Mutex};
 
 /// Capturer determines, based on a set of settings and a trace id, how capturing is going to be handled.
@@ -21,10 +20,10 @@ pub enum Capturer {
 }
 
 impl Capturer {
-    pub(super) fn new(exporter: Exporter, trace_id: TraceId, settings: Settings) -> Self {
+    pub(super) fn new(processor: Processor, trace_id: TraceId, settings: Settings) -> Self {
         if settings.is_enabled() {
             return Self::Enabled(Inner {
-                exporter,
+                processor,
                 trace_id,
                 settings,
             });
@@ -36,31 +35,31 @@ impl Capturer {
 
 #[derive(Debug, Clone)]
 pub struct Inner {
-    pub(super) exporter: Exporter,
+    pub(super) processor: Processor,
     pub(super) trace_id: TraceId,
     pub(super) settings: Settings,
 }
 
 impl Inner {
     pub async fn start_capturing(&self) {
-        self.exporter
+        self.processor
             .start_capturing(self.trace_id, self.settings.clone())
             .await
     }
 
     pub async fn fetch_captures(&self) -> Option<Storage> {
-        self.exporter.fetch_captures(self.trace_id).await
+        self.processor.fetch_captures(self.trace_id).await
     }
 }
 
-/// A [`SpanExporter`] that captures and stores spans in memory in a synchronized dictionary for
+/// A [`SpanProcessor`] that captures and stores spans in memory in a synchronized dictionary for
 /// later retrieval
 #[derive(Debug, Clone)]
-pub struct Exporter {
+pub struct Processor {
     pub(crate) storage: Arc<Mutex<HashMap<TraceId, Storage>>>,
 }
 
-impl Exporter {
+impl Processor {
     pub fn new() -> Self {
         Self {
             storage: Default::default(),
@@ -84,16 +83,82 @@ impl Exporter {
     }
 
     pub(self) async fn fetch_captures(&self, trace_id: TraceId) -> Option<Storage> {
-        _ = super::processor().force_flush();
         let mut traces = self.storage.lock().unwrap();
 
         traces.remove(&trace_id)
     }
 }
 
-impl Default for Exporter {
+impl Default for Processor {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl SpanProcessor for Processor {
+    fn on_start(&self, _: &mut Span, _: &opentelemetry::Context) {
+        // no-op
+    }
+
+    /// Exports a spancontaining zero or more events that might represent
+    /// logs in the prisma client logging categories of logs (query, info, warn, error)
+    ///
+    /// There's an impedance between the client categories of logs and the server (standard)
+    /// hierarchical levels of logs (trace, debug, info, warn, error).
+    ///
+    /// The most prominent difference is the "query" type of events. In the client these model
+    /// database queries made by the engine through a connector. But ATM there's not a 1:1 mapping
+    /// between the client "query" level and one of the server levels. And depending on the database
+    /// mongo / relational, the information to build this kind of log event is logged diffeerently in
+    /// the server.
+    ///
+    /// In the case of the of relational databaes --queried through sql_query_connector and eventually
+    /// through quaint, a trace span describes the query-- `TraceSpan::represents_query_event`
+    /// determines if a span represents a query event.
+    ///
+    /// In the case of mongo, an event represents the query, but it needs to be transformed before
+    /// capturing it. `Event::query_event` does that.    
+    fn on_end(&self, span_data: SpanData) {
+        let trace_id = span_data.span_context.trace_id();
+
+        let mut locked_storage = self.storage.lock().unwrap();
+        if let Some(storage) = locked_storage.get_mut(&trace_id) {
+            let settings = storage.settings.clone();
+            let original_span_name = span_data.name.clone();
+
+            let (events, span) = models::TraceSpan::from(span_data).split_events();
+
+            let candidate_span = Candidate {
+                value: span,
+                settings: &settings,
+                original_span_name: Some(original_span_name),
+            };
+
+            let capture: Capture = candidate_span.into();
+            capture.add_to(&mut storage.traces, &mut storage.logs);
+
+            if storage.settings.logs_enabled() {
+                events.into_iter().for_each(|log| {
+                    let candidate_event = Candidate {
+                        value: log,
+                        settings: &settings,
+                        original_span_name: None,
+                    };
+                    let capture: Capture = candidate_event.into();
+                    capture.add_to(&mut storage.traces, &mut storage.logs);
+                });
+            }
+        }
+    }
+
+    fn force_flush(&self) -> TraceResult<()> {
+        // no-op
+        Ok(())
+    }
+
+    fn shutdown(&mut self) -> TraceResult<()> {
+        // no-op
+        Ok(())
     }
 }
 
@@ -256,96 +321,6 @@ impl From<Candidate<'_, models::TraceSpan>> for Capture {
     }
 }
 
-#[async_trait]
-impl SpanExporter for Exporter {
-    /// Exports a batch of spans, each of them containing zero or more events that might represent
-    /// logs in the prisma client logging categories of logs (query, info, warn, error)
-    ///
-    /// There's an impedance between the client categories of logs and the server (standard)
-    /// hierarchical levels of logs (trace, debug, info, warn, error).
-    ///
-    /// The most prominent difference is the "query" type of events. In the client these model
-    /// database queries made by the engine through a connector. But ATM there's not a 1:1 mapping
-    /// between the client "query" level and one of the server levels. And depending on the database
-    /// mongo / relational, the information to build this kind of log event is logged diffeerently in
-    /// the server.
-    ///
-    /// In the case of the of relational databaes --queried through sql_query_connector and eventually
-    /// through quaint, a trace span describes the query-- `TraceSpan::represents_query_event`
-    /// determines if a span represents a query event.
-    ///
-    /// In the case of mongo, an event represents the query, but it needs to be transformed before
-    /// capturing it. `Event::query_event` does that.    
-    async fn export(&mut self, batch: Vec<SpanData>) -> ExportResult {
-        for span_data in batch {
-            let trace_id = span_data.span_context.trace_id();
-
-            let mut locked_storage = self.storage.lock().unwrap();
-            if let Some(storage) = locked_storage.get_mut(&trace_id) {
-                let settings = storage.settings.clone();
-                let original_span_name = span_data.name.clone();
-
-                let (events, span) = models::TraceSpan::from(span_data).split_events();
-
-                let candidate_span = Candidate {
-                    value: span,
-                    settings: &settings,
-                    original_span_name: Some(original_span_name),
-                };
-
-                let capture: Capture = candidate_span.into();
-                capture.add_to(&mut storage.traces, &mut storage.logs);
-
-                if storage.settings.logs_enabled() {
-                    events.into_iter().for_each(|log| {
-                        let candidate_event = Candidate {
-                            value: log,
-                            settings: &settings,
-                            original_span_name: None,
-                        };
-                        let capture: Capture = candidate_event.into();
-                        capture.add_to(&mut storage.traces, &mut storage.logs);
-                    });
-                }
-            }
-        }
-
-        Ok(())
-    }
-}
-
-/// An adapter of a SpanProcessor that is shareable accross thread boundaries, so we can
-/// flush the processor before each request finishes.
-#[derive(Debug, Clone)]
-pub(super) struct SyncedSpanProcessor(Arc<Mutex<dyn SpanProcessor>>);
-
-impl SyncedSpanProcessor {
-    pub(super) fn new(exporter: Exporter) -> Self {
-        let adaptee = BatchSpanProcessor::builder(exporter, opentelemetry::runtime::Tokio)
-            .with_scheduled_delay(Duration::new(0, 1))
-            .build();
-        Self(Arc::new(Mutex::new(adaptee)))
-    }
-}
-
-impl SpanProcessor for SyncedSpanProcessor {
-    fn on_start(&self, _: &mut Span, _: &opentelemetry::Context) {
-        // no-op
-    }
-
-    fn on_end(&self, span: SpanData) {
-        self.0.lock().unwrap().on_end(span)
-    }
-
-    fn force_flush(&self) -> TraceResult<()> {
-        self.0.lock().unwrap().force_flush()
-    }
-
-    fn shutdown(&mut self) -> TraceResult<()> {
-        self.0.lock().unwrap().shutdown()
-    }
-}
-
 /// tests for capture exporter
 #[cfg(test)]
 mod tests {
@@ -494,7 +469,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_garbage_collection() {
-        let exporter = Exporter::new();
+        let exporter = Processor::new();
 
         let trace_id = TraceId::from_hex("1").unwrap();
         let one_ms = Duration::from_millis(1);
