@@ -31,8 +31,6 @@
 # - https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/virtualisation/qemu-vm.nix
 let
   evalConfig = import "${flakeInputs.nixpkgs}/nixos/lib/eval-config.nix";
-  prisma-engines = self'.packages.prisma-engines;
-  prisma-engines-inputs = prisma-engines.buildInputs ++ prisma-engines.nativeBuildInputs;
   vmConfig = (evalConfig {
     modules = [
       {
@@ -51,23 +49,20 @@ let
           writableStore = true;
           writableStoreUseTmpfs = false;
           sharedDirectories.prisma-engines = {
-            source = "${prisma-engines.src}";
+            source = "${self'.packages.prisma-engines.src}";
             target = "/home/prisma/prisma-engines";
           };
         };
 
         # Enable flakes in the host vm
-        nix = {
-          # package = pkgs.nixUnstable;
-          extraOptions = "experimental-features = nix-command flakes";
-        };
+        nix.extraOptions = "experimental-features = nix-command flakes";
 
         environment.systemPackages = with pkgs; [
           tmux
           git
-          coreutils
           gnumake
-        ] ++ prisma-engines-inputs;
+          self'.packages.query-engine-tests
+        ];
 
         services.openssh = {
           listenAddresses = [{
