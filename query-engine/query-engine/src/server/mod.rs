@@ -460,7 +460,7 @@ fn capture_config(headers: &HeaderMap, tx_id: TxId) -> telemetry::capturing::Cap
     let traceparent = traceparent(headers);
 
     if traceparent.is_none() && capture_settings.is_enabled() {
-        span.set_parent(tx_id.clone().into())
+        span.set_parent(tx_id.into())
     } else {
         span.set_parent(get_parent_span_context(headers))
     }
@@ -469,6 +469,7 @@ fn capture_config(headers: &HeaderMap, tx_id: TxId) -> telemetry::capturing::Cap
     telemetry::capturing::capturer(trace_id, capture_settings)
 }
 
+#[allow(clippy::bind_instead_of_map)]
 fn capture_settings(headers: &HeaderMap) -> telemetry::capturing::Settings {
     const TRACE_CAPTURE_HEADER: &str = "X-capture-telemetry";
     headers
@@ -484,9 +485,9 @@ fn traceparent(headers: &HeaderMap) -> Option<String> {
     let value = headers
         .get(TRACEPARENT_HEADER)
         .and_then(|h| h.to_str().ok())
-        .and_then(|s| Some(s.to_owned()));
+        .map(|s| s.to_owned());
 
-    let is_valid_traceparent = |s: &String| s.split_terminator('-').collect::<Vec<&str>>().len() >= 4;
+    let is_valid_traceparent = |s: &String| s.split_terminator('-').count() >= 4;
 
     match &value {
         Some(str) if is_valid_traceparent(str) => value,
@@ -494,6 +495,7 @@ fn traceparent(headers: &HeaderMap) -> Option<String> {
     }
 }
 
+#[allow(clippy::bind_instead_of_map)]
 fn transaction_id(headers: &HeaderMap) -> Option<TxId> {
     const TRANSACTION_ID_HEADER: &str = "X-transaction-id";
     headers

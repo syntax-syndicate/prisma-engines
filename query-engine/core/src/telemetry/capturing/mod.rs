@@ -134,7 +134,7 @@ static TRACER: Lazy<sdk::trace::Tracer> = Lazy::new(setup_and_install_tracer_glo
 /// Creates a new capturer, which is configured to export traces and log events happening during a
 /// particular request
 pub fn capturer(trace_id: trace::TraceId, settings: Settings) -> Capturer {
-    Capturer::new(EXPORTER.to_owned(), trace_id, settings.into())
+    Capturer::new(EXPORTER.to_owned(), trace_id, settings)
 }
 
 /// Returns a clone of the global processor used by the tracer and used for deterministic flushing
