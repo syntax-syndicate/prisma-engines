@@ -240,7 +240,7 @@ fn push_relation_tables(ctx: &mut Context<'_>) {
             .column_type()
             .clone();
 
-        let column_a_id = ctx.schema.describer_schema.push_column(
+        let column_a_id = ctx.schema.describer_schema.push_table_column(
             table_id,
             sql::Column {
                 name: model_a_column.into(),
@@ -249,7 +249,7 @@ fn push_relation_tables(ctx: &mut Context<'_>) {
                 auto_increment: false,
             },
         );
-        let column_b_id = ctx.schema.describer_schema.push_column(
+        let column_b_id = ctx.schema.describer_schema.push_table_column(
             table_id,
             sql::Column {
                 name: model_b_column.into(),
@@ -404,7 +404,7 @@ fn push_column_for_model_enum_scalar_field(
         auto_increment: false,
     };
 
-    ctx.schema.describer_schema.push_column(table_id, column);
+    ctx.schema.describer_schema.push_table_column(table_id, column);
 }
 
 fn push_column_for_model_unsupported_scalar_field(
@@ -439,7 +439,7 @@ fn push_column_for_model_unsupported_scalar_field(
         auto_increment: false,
     };
 
-    ctx.schema.describer_schema.push_column(table_id, column);
+    ctx.schema.describer_schema.push_table_column(table_id, column);
 }
 
 fn push_column_for_builtin_scalar_type(
@@ -527,7 +527,7 @@ fn push_column_for_builtin_scalar_type(
         default_value_id,
     };
 
-    let column_id = ctx.schema.describer_schema.push_column(table_id, column);
+    let column_id = ctx.schema.describer_schema.push_table_column(table_id, column);
 
     if default_is_prisma_level {
         ctx.schema.prisma_level_defaults.push(column_id);
