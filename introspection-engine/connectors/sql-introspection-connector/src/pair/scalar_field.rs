@@ -3,11 +3,11 @@ use psl::{
     datamodel_connector::walker_ext_traits::IndexWalkerExt, parser_database::walkers,
     schema_ast::ast::WithDocumentation,
 };
-use sql::ColumnArity;
+use sql::{ColumnArity, Either};
 use sql_schema_describer as sql;
 use std::borrow::Cow;
 
-use super::{DefaultValuePair, IdPair, IndexPair, ModelPair, Pair};
+use super::{DefaultValuePair, IdPair, IndexPair, ModelPair, Pair, ViewPair};
 
 pub(crate) type ScalarFieldPair<'a> = Pair<'a, walkers::ScalarFieldWalker<'a>, sql::ColumnWalker<'a>>;
 
@@ -40,11 +40,13 @@ impl<'a> ScalarFieldPair<'a> {
     }
 
     /// The model where the field is defined.
-    pub fn model(self) -> ModelPair<'a> {
+    pub fn container(self) -> Either<ModelPair<'a>, ViewPair<'a>> {
         let previous = self.previous.map(|f| f.model());
-        let next = self.next.table();
 
-        Pair::new(self.context, previous, next)
+        match self.next.container() {
+            Either::Left(table) => Either::Left(Pair::new(self.context, previous, table)),
+            Either::Right(view) => Either::Right(Pair::new(self.context, previous, view)),
+        }
     }
 
     /// True if we took the name from the PSL.
@@ -130,15 +132,17 @@ impl<'a> ScalarFieldPair<'a> {
 
     /// The primary key of the field.
     pub fn id(self) -> Option<IdPair<'a>> {
-        self.next
-            .table()
-            .primary_key()
-            .filter(|pk| pk.columns().len() == 1)
-            .filter(|pk| pk.contains_column(self.next.id))
-            .map(move |next| {
-                let previous = self.previous.and_then(|field| field.model().primary_key());
-                Pair::new(self.context, previous, next)
-            })
+        match self.next.container() {
+            Either::Left(table) => table
+                .primary_key()
+                .filter(|pk| pk.columns().len() == 1)
+                .filter(|pk| pk.contains_column(self.next.id))
+                .map(move |next| {
+                    let previous = self.previous.and_then(|field| field.model().primary_key());
+                    Pair::new(self.context, previous, next)
+                }),
+            Either::Right(_) => todo!(),
+        }
     }
 
     /// If the field itself defines a unique constraint.

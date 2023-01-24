@@ -467,12 +467,12 @@ impl<'a> super::SqlSchemaDescriberBackend for SqlSchemaDescriber<'a> {
         //TODO(matthias) can we get rid of the table names map and instead just use tablewalker_ns everywhere like in get_columns?
         let table_names = self.get_table_names(&mut sql_schema).await?;
 
+        self.get_views(&mut sql_schema).await?;
         self.get_enums(&mut sql_schema).await?;
         self.get_columns(&mut sql_schema).await?;
         self.get_foreign_keys(&table_names, &mut sql_schema).await?;
         self.get_indices(&table_names, &mut pg_ext, &mut sql_schema).await?;
 
-        self.get_views(&mut sql_schema).await?;
         self.get_procedures(&mut sql_schema).await?;
         self.get_extensions(&mut pg_ext).await?;
 
@@ -786,7 +786,7 @@ impl<'a> SqlSchemaDescriber<'a> {
                         Some(DefaultKind::DbGenerated(Some(s))) if s == "unique_rowid()"
                     ));
 
-            let column_id = ColumnId(sql_schema.table_columns.len() as u32);
+            let column_id = ColumnId(sql_schema.columns.len() as u32);
             let default_value_id = default.map(|default| sql_schema.push_default_value(column_id, default));
 
             let col = Column {
@@ -809,8 +809,7 @@ impl<'a> SqlSchemaDescriber<'a> {
         // We need to sort because the collation in the system tables (pg_class) is different from
         // that of the information schema, so tables come out of different order in the tables
         // query and the columns query.
-        sql_schema.table_columns.sort_by_key(|(table_id, _)| *table_id);
-        sql_schema.view_columns.sort_by_key(|(table_id, _)| *table_id);
+        sql_schema.columns.sort_by_key(|(container_id, _)| *container_id);
 
         Ok(())
     }

@@ -1,7 +1,7 @@
 use crate::{
     introspection_helpers::{is_new_migration_table, is_old_migration_table, is_prisma_join_table, is_relay_table},
     introspection_map::RelationName,
-    pair::{EnumPair, ModelPair, Pair, RelationFieldDirection},
+    pair::{EnumPair, ModelPair, Pair, RelationFieldDirection, ViewPair},
     warnings, EnumVariantName, IntrospectedName, ModelName,
 };
 use introspection_connector::{Version, Warning};
@@ -151,6 +151,13 @@ impl<'a> InputContext<'a> {
             .map(|id| self.previous_schema.db.walk(*id))
     }
 
+    pub(crate) fn existing_view(self, id: sql::ViewId) -> Option<walkers::ModelWalker<'a>> {
+        self.introspection_map
+            .existing_views
+            .get(&id)
+            .map(|id| self.previous_schema.db.walk(*id))
+    }
+
     pub(crate) fn existing_scalar_field(self, id: sql::ColumnId) -> Option<walkers::ScalarFieldWalker<'a>> {
         self.introspection_map
             .existing_scalar_fields
@@ -178,6 +185,19 @@ impl<'a> InputContext<'a> {
 
         let table = self.schema.walk(id);
         ModelName::new_from_sql(table.name(), table.namespace(), self)
+    }
+
+    // Use the existing view name when available.
+    pub(crate) fn view_prisma_name(self, id: sql::ViewId) -> crate::ModelName<'a> {
+        if let Some(view) = self.existing_view(id) {
+            return ModelName::FromPsl {
+                name: view.name(),
+                mapped_name: view.mapped_name(),
+            };
+        }
+
+        let view = self.schema.walk(id);
+        ModelName::new_from_sql(view.name(), view.namespace(), self)
     }
 
     pub(crate) fn name_is_unique(self, name: &'a str) -> bool {
@@ -308,5 +328,12 @@ impl<'a> InputContext<'a> {
 
                 (*direction, next)
             })
+    }
+
+    pub(crate) fn view_pairs(self) -> impl ExactSizeIterator<Item = ViewPair<'a>> {
+        self.schema.view_walkers().map(move |next| {
+            let previous = self.existing_view(next.id);
+            Pair::new(self, previous, next)
+        })
     }
 }

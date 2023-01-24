@@ -17,12 +17,6 @@ impl<'a> ModelPair<'a> {
         self.previous.map(|m| m.id)
     }
 
-    /// Temporary method for relations. Eventually we'll remove this
-    /// when we handle relations together with models and fields.
-    pub(crate) fn table_id(self) -> sql::TableId {
-        self.next.id
-    }
-
     /// The namespace of the model, if using the multi-schema feature.
     pub(crate) fn namespace(self) -> Option<&'a str> {
         if self.context.uses_namespaces() {
@@ -50,7 +44,7 @@ impl<'a> ModelPair<'a> {
         psl::is_reserved_type_name(self.next.name())
     }
 
-    /// The documentation on top of the enum.
+    /// The documentation on top of the model.
     pub(crate) fn documentation(self) -> Option<&'a str> {
         self.previous.and_then(|model| model.ast_model().documentation())
     }
@@ -185,5 +179,9 @@ impl<'a> ModelPair<'a> {
 
                 (!pair.defined_in_a_field()).then_some(pair)
             })
+    }
+
+    fn table_id(self) -> sql::TableId {
+        self.next.id
     }
 }

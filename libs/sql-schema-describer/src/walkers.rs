@@ -2,6 +2,7 @@
 
 #![deny(missing_docs)]
 
+use either::Either;
 use psl::dml::PrismaValue;
 
 use crate::{
@@ -137,8 +138,8 @@ impl<'a> ColumnWalker<'a> {
         self.get().1.tpe.arity
     }
 
-    fn get(self) -> &'a (TableId, Column) {
-        &self.schema.table_columns[self.id.0 as usize]
+    fn get(self) -> &'a (Either<TableId, ViewId>, Column) {
+        &self.schema.columns[self.id.0 as usize]
     }
 
     /// Returns whether the column has the enum default value of the given enum type.
@@ -198,41 +199,57 @@ impl<'a> ColumnWalker<'a> {
 
     /// Is this column indexed by a secondary index??
     pub fn is_part_of_secondary_index(self) -> bool {
-        self.table().indexes().any(|idx| idx.contains_column(self.id))
+        match self.container() {
+            Either::Left(table) => table.indexes().any(|idx| idx.contains_column(self.id)),
+            Either::Right(_) => false,
+        }
     }
 
     /// Is this column a part of the table's primary key?
     pub fn is_part_of_primary_key(self) -> bool {
-        match self.table().primary_key() {
-            Some(pk) => pk.contains_column(self.id),
-            None => false,
-        }
+        self.container()
+            .left()
+            .and_then(|table| table.primary_key())
+            .map(|pk| pk.contains_column(self.id))
+            .unwrap_or(false)
     }
 
     /// Is this column a part of one of the table's foreign keys?
     pub fn is_part_of_foreign_key(self) -> bool {
         let column_id = self.id;
-        self.table()
-            .foreign_keys()
-            .any(|fk| fk.constrained_columns().any(|col| col.id == column_id))
+
+        match self.container() {
+            Either::Left(table) => table
+                .foreign_keys()
+                .any(|fk| fk.constrained_columns().any(|col| col.id == column_id)),
+            Either::Right(_) => false,
+        }
     }
 
     /// Returns whether two columns are named the same and belong to the same table.
     pub fn is_same_column(self, other: ColumnWalker<'_>) -> bool {
-        self.name() == other.name() && self.table().name() == other.table().name()
+        self.name() == other.name() && self.get().0 == other.get().0
     }
 
     /// Returns whether this column is the primary key. If it is only part of the primary key, this will return false.
     pub fn is_single_primary_key(self) -> bool {
-        self.table()
-            .primary_key()
-            .map(|pk| pk.columns().len() == 1 && pk.columns().next().map(|c| c.name() == self.name()).unwrap_or(false))
-            .unwrap_or(false)
+        match self.container() {
+            Either::Left(table) => table
+                .primary_key()
+                .map(|pk| {
+                    pk.columns().len() == 1 && pk.columns().next().map(|c| c.name() == self.name()).unwrap_or(false)
+                })
+                .unwrap_or(false),
+            Either::Right(_) => false,
+        }
     }
 
     /// Traverse to the column's table.
-    pub fn table(self) -> TableWalker<'a> {
-        self.walk(self.get().0)
+    pub fn container(self) -> Either<TableWalker<'a>, ViewWalker<'a>> {
+        match self.get().0 {
+            Either::Left(table_id) => Either::Left(self.walk(table_id)),
+            Either::Right(view_id) => Either::Right(self.walk(view_id)),
+        }
     }
 }
 
@@ -253,6 +270,17 @@ impl<'a> ViewWalker<'a> {
             .namespaces
             .get(self.view().namespace_id.0 as usize)
             .map(|s| s.as_str())
+    }
+
+    /// Traverse the table's columns.
+    pub fn columns(self) -> impl ExactSizeIterator<Item = ColumnWalker<'a>> {
+        self.columns_range()
+            .into_iter()
+            .map(move |idx| self.walk(ColumnId(idx as u32)))
+    }
+
+    fn columns_range(self) -> Range<usize> {
+        range_for_key(&self.schema.columns, Either::Right(self.id), |(tid, _)| *tid)
     }
 
     fn view(self) -> &'a View {
@@ -296,7 +324,7 @@ impl<'a> TableWalker<'a> {
     }
 
     fn columns_range(self) -> Range<usize> {
-        range_for_key(&self.schema.table_columns, self.id, |(tid, _)| *tid)
+        range_for_key(&self.schema.columns, Either::Left(self.id), |(tid, _)| *tid)
     }
 
     /// Traverse the table's columns.

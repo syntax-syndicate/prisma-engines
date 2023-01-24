@@ -5,6 +5,7 @@ use crate::{
     DescriberError, DescriberErrorKind, DescriberResult, ForeignKeyAction, IndexColumn, Procedure, SQLSortOrder,
     SqlMetadata, SqlSchema, UserDefinedType, View,
 };
+use either::Either;
 use enumflags2::BitFlags;
 use indexmap::IndexMap;
 use indoc::indoc;
@@ -384,7 +385,7 @@ impl<'a> SqlSchemaDescriber<'a> {
                 },
             };
 
-            let column_id = ColumnId(sql_schema.table_columns.len() as u32);
+            let column_id = ColumnId(sql_schema.columns.len() as u32);
             let default_value_id = default.map(|default| sql_schema.push_default_value(column_id, default));
 
             let column = Column {
@@ -394,7 +395,7 @@ impl<'a> SqlSchemaDescriber<'a> {
                 auto_increment,
             };
 
-            sql_schema.table_columns.push((table_id, column));
+            sql_schema.columns.push((Either::Left(table_id), column));
         }
 
         Ok(())

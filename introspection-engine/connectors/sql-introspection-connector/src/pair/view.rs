@@ -1,0 +1,154 @@
+use std::borrow::Cow;
+
+use psl::{
+    parser_database::walkers,
+    schema_ast::ast::{self, WithDocumentation},
+};
+use sql_schema_describer as sql;
+
+use super::{Pair, ScalarFieldPair};
+
+pub(crate) type ViewPair<'a> = Pair<'a, walkers::ModelWalker<'a>, sql::ViewWalker<'a>>;
+
+impl<'a> ViewPair<'a> {
+    /// The position of the view from the PSL, if existing. Used for
+    /// sorting the views in the final introspected data model.
+    pub(crate) fn previous_position(self) -> Option<ast::ModelId> {
+        self.previous.map(|m| m.id)
+    }
+
+    /// The namespace of the model, if using the multi-schema feature.
+    pub(crate) fn namespace(self) -> Option<&'a str> {
+        if self.context.uses_namespaces() {
+            self.next.namespace()
+        } else {
+            None
+        }
+    }
+
+    /// Name of the model in the PSL. The value can be sanitized if it
+    /// contains characters that are not allowed in the PSL
+    /// definition.
+    pub(crate) fn name(self) -> Cow<'a, str> {
+        self.context.view_prisma_name(self.next.id).prisma_name()
+    }
+
+    /// The mapped name, if defined, is the actual name of the view in
+    /// the database.
+    pub(crate) fn mapped_name(self) -> Option<&'a str> {
+        self.context.view_prisma_name(self.next.id).mapped_name()
+    }
+
+    /// True, if the name of the view is using a reserved identifier.
+    pub(crate) fn uses_reserved_name(self) -> bool {
+        psl::is_reserved_type_name(self.next.name())
+    }
+
+    /// The documentation on top of the view.
+    pub(crate) fn documentation(self) -> Option<&'a str> {
+        self.previous.and_then(|view| view.ast_model().documentation())
+    }
+
+    /// Iterating over the scalar fields.
+    pub(crate) fn scalar_fields(self) -> impl ExactSizeIterator<Item = ScalarFieldPair<'a>> {
+        self.next.columns().map(move |next| {
+            let previous = self.context.existing_scalar_field(next.id);
+            Pair::new(self.context, previous, next)
+        })
+    }
+
+    /// True, if the user has explicitly mapped the view's name in
+    /// the PSL.
+    pub(crate) fn remapped_name(self) -> bool {
+        self.previous.filter(|v| v.mapped_name().is_some()).is_some()
+    }
+
+    /// A view must have either an id, or at least one unique
+    /// index defined that consists of columns that are all supported by
+    /// prisma and not null.
+    ///
+    /// We cannot fetch these from the underlying table during introspection,
+    /// so this is always false if the user hasn't explicitly specified them
+    /// in the PSL.
+    pub(crate) fn has_usable_identifier(self) -> bool {
+        let identifier_in_indices = self
+            .previous
+            .map(|view| view.indexes().filter(|idx| idx.is_unique()))
+            .map(|mut idxs| {
+                idxs.any(|idx| {
+                    idx.fields()
+                        .all(|f| !f.is_unsupported() && f.ast_field().arity.is_required())
+                })
+            })
+            .unwrap_or(false);
+
+        let identifier_in_id = self
+            .previous
+            .and_then(|view| {
+                view.primary_key().map(|pk| {
+                    pk.fields()
+                        .all(|f| !f.is_unsupported() && f.ast_field().arity.is_required())
+                })
+            })
+            .unwrap_or(false);
+
+        identifier_in_indices || identifier_in_id
+    }
+
+    /// True, if the view uses the same name as another top-level item from
+    /// a different namespace.
+    pub(crate) fn uses_duplicate_name(self) -> bool {
+        self.previous.is_none() && !self.context.name_is_unique(self.next.name())
+    }
+
+    /// If the view is marked as ignored. Can happen either if user
+    /// explicitly sets the view attribute, or if the view has no
+    /// usable identifiers.
+    pub(crate) fn ignored(self) -> bool {
+        let explicit_ignore = self.previous.map(|view| view.is_ignored()).unwrap_or(false);
+        let implicit_ignore = !self.has_usable_identifier() && self.scalar_fields().len() > 0;
+
+        explicit_ignore || implicit_ignore
+    }
+
+    /// Returns an iterator over all unique indexes of the view,
+    /// specifically the ones defined in as view attributes, skipping
+    /// the unique indexes defined in a field.
+    ///
+    /// This is not really a constraint defined in the database, but for
+    /// now we have to have some unique item in a view for the client to
+    /// work. In the tables underneath there are constraints, but we
+    /// cannot see them in the information schema.
+    ///
+    /// Therefore user has to define the constraints manually, and
+    /// for introspection, we take them from the PSL as-is.
+    ///
+    /// For the primary key, use [`ViewPair#id`]. For a field-level
+    /// unique, use [`ScalarFieldPair#unique`].
+    pub(crate) fn unique_indexes(self) -> Box<dyn Iterator<Item = walkers::IndexWalker<'a>> + 'a> {
+        let previous = match self.previous {
+            Some(previous) => previous,
+            None => return Box::new(std::iter::empty()),
+        };
+
+        let indexes = previous.indexes().filter(|i| i.is_unique() && i.fields().len() > 1);
+
+        Box::new(indexes)
+    }
+
+    /// The primary key of the view, if defined as a block constraint
+    /// in the view.
+    ///
+    /// As with the unique indexes, it is just a virtual thing for
+    /// the client to be able to query the view for now.
+    ///
+    /// The id is always just in the PSL, and we cannot get that
+    /// information from the information schema.
+    ///
+    /// For a field-level id, use [`ScalarFieldPair#unique`].
+    pub(crate) fn id(self) -> Option<walkers::PrimaryKeyWalker<'a>> {
+        self.previous
+            .and_then(|prev| prev.primary_key())
+            .filter(|pk| pk.fields().len() > 1)
+    }
+}

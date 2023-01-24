@@ -21,6 +21,8 @@ pub use self::{
     walkers::*,
 };
 
+pub use either::Either;
+
 use once_cell::sync::Lazy;
 use psl::dml::PrismaValue;
 use regex::Regex;
@@ -63,7 +65,7 @@ pub struct SqlSchema {
     enums: Vec<Enum>,
     enum_variants: Vec<EnumVariant>,
     /// The schema's columns that are in tables.
-    table_columns: Vec<(TableId, Column)>,
+    columns: Vec<(Either<TableId, ViewId>, Column)>,
     /// All foreign keys.
     foreign_keys: Vec<ForeignKey>,
     /// All default values.
@@ -76,8 +78,6 @@ pub struct SqlSchema {
     index_columns: Vec<IndexColumn>,
     /// The schema's views,
     views: Vec<View>,
-    /// The schema's columns that are in views.
-    view_columns: Vec<(ViewId, Column)>,
     /// The stored procedures.
     procedures: Vec<Procedure>,
     /// The user-defined types procedures.
@@ -95,7 +95,7 @@ impl SqlSchema {
 
     /// The id of the next column
     pub fn next_column_id(&self) -> ColumnId {
-        ColumnId(self.table_columns.len() as u32)
+        ColumnId(self.columns.len() as u32)
     }
 
     /// Extract connector-specific constructs mutably. The type parameter must be the right one.
@@ -146,6 +146,16 @@ impl SqlSchema {
             .map(|i| TableId(i as u32))
     }
 
+    /// Try to find a view by name.
+    pub fn find_view(&self, name: &str, namespace: Option<&str>) -> Option<ViewId> {
+        let ns_id = namespace.and_then(|ns| self.get_namespace(ns));
+
+        self.views
+            .iter()
+            .position(|t| t.name == name && ns_id.map(|id| id == t.namespace_id).unwrap_or(true))
+            .map(|i| ViewId(i as u32))
+    }
+
     /// Get a procedure.
     pub fn get_procedure(&self, name: &str) -> Option<&Procedure> {
         self.procedures.iter().find(|x| x.name == name)
@@ -180,15 +190,15 @@ impl SqlSchema {
 
     /// Add a table column to the schema.
     pub fn push_table_column(&mut self, table_id: TableId, column: Column) -> ColumnId {
-        let id = ColumnId(self.table_columns.len() as u32);
-        self.table_columns.push((table_id, column));
+        let id = ColumnId(self.columns.len() as u32);
+        self.columns.push((Either::Left(table_id), column));
         id
     }
 
     /// Add a view column to the schema.
     pub fn push_view_column(&mut self, view_id: ViewId, column: Column) -> ColumnId {
-        let id = ColumnId(self.view_columns.len() as u32);
-        self.view_columns.push((view_id, column));
+        let id = ColumnId(self.columns.len() as u32);
+        self.columns.push((Either::Right(view_id), column));
         id
     }
 
@@ -320,6 +330,10 @@ impl SqlSchema {
         self.tables.len()
     }
 
+    pub fn views_count(&self) -> usize {
+        self.views.len()
+    }
+
     pub fn table_walker<'a>(&'a self, name: &str) -> Option<TableWalker<'a>> {
         let table_idx = self.tables.iter().position(|table| table.name == name)?;
         Some(self.walk(TableId(table_idx as u32)))
@@ -377,7 +391,7 @@ impl SqlSchema {
 
     /// Traverse all the columns in the schema.
     pub fn walk_columns(&self) -> impl Iterator<Item = ColumnWalker<'_>> {
-        (0..self.table_columns.len()).map(|idx| self.walk(ColumnId(idx as u32)))
+        (0..self.columns.len()).map(|idx| self.walk(ColumnId(idx as u32)))
     }
 
     /// Traverse all namespaces in the catalog.

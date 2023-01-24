@@ -20,6 +20,7 @@ pub(crate) use relation_names::RelationName;
 pub(crate) struct IntrospectionMap<'a> {
     pub(crate) existing_enums: HashMap<sql::EnumId, ast::EnumId>,
     pub(crate) existing_models: HashMap<sql::TableId, ast::ModelId>,
+    pub(crate) existing_views: HashMap<sql::ViewId, ast::ModelId>,
     pub(crate) missing_tables_for_previous_models: HashSet<ast::ModelId>,
     pub(crate) existing_scalar_fields: HashMap<sql::ColumnId, (ast::ModelId, ast::FieldId)>,
     pub(crate) existing_inline_relations: HashMap<sql::ForeignKeyId, parser_database::RelationId>,
@@ -37,6 +38,7 @@ impl<'a> IntrospectionMap<'a> {
         let mut map = Default::default();
 
         match_existing_models(sql_schema, prisma_schema, &mut map);
+        match_existing_views(sql_schema, prisma_schema, &mut map);
         match_enums(sql_schema, prisma_schema, &mut map);
         match_existing_scalar_fields(sql_schema, prisma_schema, &mut map);
         match_existing_inline_relations(sql_schema, prisma_schema, &mut map);
@@ -178,6 +180,20 @@ fn match_existing_models(schema: &sql::SqlSchema, prisma_schema: &psl::Validated
             None => {
                 map.missing_tables_for_previous_models.insert(model.id);
             }
+        }
+    }
+}
+
+/// Finding views from the existing PSL definition, matching the
+/// ones found in the database.
+fn match_existing_views<'a>(
+    sql_schema: &'a sql::SqlSchema,
+    prisma_schema: &'a psl::ValidatedSchema,
+    map: &mut IntrospectionMap<'a>,
+) {
+    for view in prisma_schema.db.walk_views() {
+        if let Some(sql_id) = sql_schema.find_view(view.database_name(), view.schema_name()) {
+            map.existing_views.insert(sql_id, view.id);
         }
     }
 }

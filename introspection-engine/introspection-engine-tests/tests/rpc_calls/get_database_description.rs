@@ -177,7 +177,7 @@ async fn database_description_for_postgres_should_work(api: &TestApi) -> TestRes
           ],
           "enums": [],
           "enum_variants": [],
-          "columns": [
+          "table_columns": [
             [
               0,
               {
@@ -234,6 +234,7 @@ async fn database_description_for_postgres_should_work(api: &TestApi) -> TestRes
             }
           ],
           "views": [],
+          "view_columns": [],
           "procedures": [],
           "user_defined_types": [],
           "connector_data": null

@@ -7,7 +7,7 @@ use sql_schema_describer as sql;
 
 use super::{IndexFieldPair, Pair};
 
-pub(crate) type IndexPair<'a> = Pair<'a, walkers::IndexWalker<'a>, sql::IndexWalker<'a>>;
+pub(crate) type IndexPair<'a> = Pair<'a, walkers::IndexWalker<'a>, Option<sql::IndexWalker<'a>>>;
 
 impl<'a> IndexPair<'a> {
     /// The position of the index from the PSL, if existing. Used for

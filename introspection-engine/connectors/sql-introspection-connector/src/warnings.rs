@@ -25,6 +25,8 @@ pub(crate) struct Warnings {
     pub(crate) models_without_columns: Vec<Model>,
     /// Models missing a id or unique constraint.
     pub(crate) models_without_identifiers: Vec<Model>,
+    /// Views missing a id or unique constraint.
+    pub(crate) views_without_identifiers: Vec<View>,
     /// If the id attribute has a name taken from a previous data
     /// model.
     pub(crate) reintrospected_id_names: Vec<Model>,
@@ -63,6 +65,12 @@ impl Warnings {
         maybe_warn(
             &self.models_without_identifiers,
             warning_models_without_identifier,
+            &mut self.warnings,
+        );
+
+        maybe_warn(
+            &self.views_without_identifiers,
+            warning_views_without_identifier,
             &mut self.warnings,
         );
 
@@ -138,6 +146,11 @@ pub(crate) struct Model {
 }
 
 #[derive(Serialize, Debug, Clone)]
+pub(crate) struct View {
+    pub(crate) view: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct Enum {
     pub(crate) enm: String,
 }
@@ -177,6 +190,7 @@ pub(crate) struct EnumAndValue {
 pub(crate) enum TopLevelType {
     Model,
     Enum,
+    View,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -189,6 +203,14 @@ pub(crate) fn warning_models_without_identifier(affected: &[Model]) -> Warning {
     Warning {
         code: 1,
         message: "The following models were commented out as they do not have a valid unique identifier or id. This is currently not supported by the Prisma Client.".into(),
+        affected: serde_json::to_value(affected).unwrap(),
+    }
+}
+
+pub(crate) fn warning_views_without_identifier(affected: &[View]) -> Warning {
+    Warning {
+        code: 1,
+        message: "The following views were commented out as they do not have a valid unique identifier or id. This is currently not supported by the Prisma Client.".into(),
         affected: serde_json::to_value(affected).unwrap(),
     }
 }
@@ -302,11 +324,20 @@ pub(crate) fn warning_relations_added_from_the_previous_data_model(affected: &[M
 pub(crate) fn warning_top_level_item_name_is_a_dupe(affected: &[TopLevelItem]) -> Warning {
     let has_enums = affected.iter().any(|i| matches!(i.r#type, TopLevelType::Enum));
     let has_models = affected.iter().any(|i| matches!(i.r#type, TopLevelType::Model));
+    let has_views = affected.iter().any(|i| matches!(i.r#type, TopLevelType::View));
 
-    let message = if has_models && has_enums {
+    let message = if has_models && has_enums && has_views {
+        "These models, views and enums were renamed due to their names being duplicates in the Prisma Schema Language."
+    } else if has_models && has_enums {
         "These models and enums were renamed due to their names being duplicates in the Prisma Schema Language."
+    } else if has_models && has_views {
+        "These models and views were renamed due to their names being duplicates in the Prisma Schema Language."
+    } else if has_enums && has_views {
+        "These enums and views were renamed due to their names being duplicates in the Prisma Schema Language."
     } else if has_models {
         "These models were renamed due to their names being duplicates in the Prisma Schema Language."
+    } else if has_views {
+        "These views were renamed due to their names being duplicates in the Prisma Schema Language."
     } else {
         "These enums were renamed due to their names being duplicates in the Prisma Schema Language."
     };

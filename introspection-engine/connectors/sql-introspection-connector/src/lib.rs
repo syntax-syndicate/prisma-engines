@@ -128,7 +128,7 @@ impl SqlIntrospectionConnector {
 
     /// Exported for tests
     pub async fn describe(&self, provider: Option<&str>, namespaces: &[&str]) -> SqlIntrospectionResult<SqlSchema> {
-        Ok(self.describer(provider).await?.describe(namespaces).await?)
+        dbg!(Ok(self.describer(provider).await?.describe(namespaces).await?))
     }
 
     async fn version(&self) -> SqlIntrospectionResult<String> {

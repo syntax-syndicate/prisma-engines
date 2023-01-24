@@ -172,10 +172,11 @@ impl<'a> DefaultValuePair<'a> {
     }
 
     fn default_name(self) -> String {
-        ConstraintNames::default_name(
-            self.next.table().name(),
-            self.next.name(),
-            self.context.active_connector(),
-        )
+        let container_name = match self.next.container() {
+            sql::Either::Left(table) => table.name(),
+            sql::Either::Right(view) => view.name(),
+        };
+
+        ConstraintNames::default_name(container_name, self.next.name(), self.context.active_connector())
     }
 }
