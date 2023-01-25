@@ -39,6 +39,7 @@ impl TraceSpan {
 
 impl From<SpanData> for TraceSpan {
     fn from(span: SpanData) -> Self {
+        dbg!(&span);
         let attributes: HashMap<String, serde_json::Value> =
             span.attributes
                 .iter()
