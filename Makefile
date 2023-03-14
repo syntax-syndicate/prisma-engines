@@ -264,3 +264,8 @@ qe-node-api: build target/debug/libquery_engine.node
 # otherwise macOS gatekeeper may kill the Node.js process when it tries to load the library
 	if [[ "$$(uname -sm)" == "Darwin arm64" ]]; then rm -f $@; fi
 	cp $< $@
+
+qe-cross-x86:
+	LIBZ_SYS_STATIC=1 cargo zigbuild --release --target x86_64-unknown-linux-gnu -p query-engine-node-api --features vendored-openssl
+	rm -f target/x86_64-unknown-linux-gnu/release/libquery_engine.node
+	ln target/x86_64-unknown-linux-gnu/release/libquery_engine.{so,node}
