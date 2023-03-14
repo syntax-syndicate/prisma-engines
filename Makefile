@@ -265,7 +265,19 @@ qe-node-api: build target/debug/libquery_engine.node
 	if [[ "$$(uname -sm)" == "Darwin arm64" ]]; then rm -f $@; fi
 	cp $< $@
 
+.PHONY: docker-image run-docker qe-cross-x86
+
+docker-image:
+	docker buildx build --platform linux/amd64 -t prisma-x86 -f Dockerfile .
+
+CMD ?= make run
+run-docker: docker-image qe-cross-x86
+	docker run \
+		-v $(shell pwd):/engines \
+		-v $(shell pwd)/client:/app \
+		-it prisma-x86 $(CMD)
+
 qe-cross-x86:
-	LIBZ_SYS_STATIC=1 cargo zigbuild --release --target x86_64-unknown-linux-gnu -p query-engine-node-api --features vendored-openssl
-	rm -f target/x86_64-unknown-linux-gnu/release/libquery_engine.node
-	ln target/x86_64-unknown-linux-gnu/release/libquery_engine.{so,node}
+	LIBZ_SYS_STATIC=1 cargo zigbuild --target x86_64-unknown-linux-gnu -p query-engine-node-api --features vendored-openssl
+	rm -f target/x86_64-unknown-linux-gnu/debug/libquery_engine.node
+	ln target/x86_64-unknown-linux-gnu/debug/libquery_engine.{so,node}
