@@ -24,12 +24,12 @@ in
     name = "prisma-engines";
     inherit src;
 
-    buildInputs = [ pkgs.openssl.out ];
+    buildInputs = [ pkgs.openssl_1_1.out ];
     nativeBuildInputs = with pkgs; [
       cargo
       git # for our build scripts that bake in the git hash
       protobuf # for tonic
-      openssl.dev
+      openssl_1_1.dev
       pkg-config
     ] ++ lib.optionals stdenv.isDarwin [
       perl # required to build openssl

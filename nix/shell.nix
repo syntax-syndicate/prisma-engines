@@ -9,7 +9,7 @@ in
 {
   devShells.default = pkgs.mkShell {
     packages = with pkgs;
-      [ devToolchain llvmPackages_latest.bintools cargo-zigbuild ]
+      [ devToolchain llvmPackages_latest.bintools cargo-zigbuild nodejs ]
       ++ lib.optionals stdenv.isDarwin [ darwin.apple_sdk.frameworks.Security ];
     inputsFrom = [ self'.packages.prisma-engines ];
     shellHook = pkgs.lib.optionalString pkgs.stdenv.isLinux

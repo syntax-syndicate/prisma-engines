@@ -265,19 +265,29 @@ qe-node-api: build target/debug/libquery_engine.node
 	if [[ "$$(uname -sm)" == "Darwin arm64" ]]; then rm -f $@; fi
 	cp $< $@
 
-.PHONY: docker-image run-docker qe-cross-x86
+.PHONY: docker-image run-docker build-docker build-node-docker rr-docker
 
 docker-image:
-	docker buildx build --platform linux/amd64 -t prisma-x86 -f Dockerfile .
+	docker build -t rr -f Dockerfile .
 
-CMD ?= make run
-run-docker: docker-image qe-cross-x86
+CMD ?= bash
+run-docker: docker-image
 	docker run \
+		-v /nix:/nix \
 		-v $(shell pwd):/engines \
-		-v $(shell pwd)/client:/app \
-		-it prisma-x86 $(CMD)
+		-v $(shell pwd)/client:/client \
+		-v $(HOME)/node:/node \
+		-v $(HOME)/.local/share/rr:/root/.local/share/rr \
+		-v $(HOME)/.cargo/git:/root/.cargo/git \
+		-v $(HOME)/.cargo/registry:/root/.cargo/registry \
+		--cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
+		-it rr $(CMD)
 
-qe-cross-x86:
-	LIBZ_SYS_STATIC=1 cargo zigbuild --target x86_64-unknown-linux-gnu -p query-engine-node-api --features vendored-openssl
-	rm -f target/x86_64-unknown-linux-gnu/debug/libquery_engine.node
-	ln target/x86_64-unknown-linux-gnu/debug/libquery_engine.{so,node}
+build-docker:
+	$(MAKE) run-docker CMD="bash -c 'cd /engines && make qe-node-api'"
+
+build-node-docker:
+	$(MAKE) run-docker CMD="bash -c 'cd /node && ./configure --debug && make -j12'"
+
+rr-docker: # build-docker build-node-docker
+	$(MAKE) run-docker CMD="bash -c 'cd /client && make build && rr record /node/node_g index.js'"

@@ -10,5 +10,6 @@ fn store_git_commit_hash() {
 
 fn main() {
     store_git_commit_hash();
+    // println!("cargo:rustc-cdylib-link-args=-Wl,--version-script=/engines/openssl.version");
     napi_build::setup()
 }

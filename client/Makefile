@@ -1,6 +1,8 @@
-.PHONY: run
+.PHONY: build run
 
-run: node_modules/.prisma/client/index.js
+build: node_modules/.prisma/client/index.js
+
+run: build
 	node index.js
 
 node_modules/.prisma/client/index.js: index.js prisma/schema.prisma package.json package-lock.json

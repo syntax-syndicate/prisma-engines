@@ -1,9 +1,17 @@
-FROM --platform=linux/amd64 node:18
+FROM fedora
 
-RUN apt-get -y update
-RUN apt-get -y upgrade
-RUN apt-get -y install gdb
+RUN dnf -y update
+RUN dnf -y groupinstall 'Development Tools'
+RUN dnf -y install rr gdb nodejs nodejs-npm rustc cargo
+RUN dnf -y install openssl1.1-devel
+RUN dnf -y install which g++ python
+RUN dnf -y install clang lld
 
-ENV PRISMA_QUERY_ENGINE_LIBRARY=/engines/target/x86_64-unknown-linux-gnu/debug/libquery_engine.node
+ENV PRISMA_QUERY_ENGINE_LIBRARY=/engines/target/debug/libquery_engine.node
+WORKDIR /client
 
-WORKDIR /app
+RUN echo "set debuginfod enabled" > /root/.gdbinit
+
+# ENV RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld"
+
+CMD [bash]
