@@ -1,28 +1,28 @@
 pub use super::TestResult;
 pub use expect_test::expect;
 pub use indoc::{formatdoc, indoc};
-use introspection_connector::ViewDefinition;
+use introspection_connector::Version;
 pub use quaint::prelude::Queryable;
 pub use test_macros::test_connector;
 pub use test_setup::{BitFlags, Capabilities, Tags};
 
 use crate::{BarrelMigrationExecutor, Result};
-use introspection_connector::{
-    CompositeTypeDepth, ConnectorResult, DatabaseMetadata, IntrospectionConnector, IntrospectionContext,
-    IntrospectionResult, Version,
-};
+use introspection_connector::{CompositeTypeDepth, IntrospectionContext};
 use migration_connector::{ConnectorParams, MigrationConnector};
+use migration_core::json_rpc::types::IntrospectParams;
+use migration_core::json_rpc::types::IntrospectResult;
+use migration_core::json_rpc::types::IntrospectionView;
+use migration_core::GenericApi;
 use psl::Configuration;
 use psl::PreviewFeature;
 use quaint::{prelude::SqlFamily, single::Quaint};
-use sql_introspection_connector::SqlIntrospectionConnector;
 use sql_migration_connector::SqlMigrationConnector;
 use std::fmt::Write;
 use test_setup::{sqlite_test_url, DatasourceBlock, TestApiArgs};
 use tracing::Instrument;
 
 pub struct TestApi {
-    pub api: SqlIntrospectionConnector,
+    pub api: Box<dyn GenericApi>,
     database: Quaint,
     args: TestApiArgs,
     connection_string: String,
@@ -84,9 +84,18 @@ impl TestApi {
             unreachable!()
         };
 
-        let api = SqlIntrospectionConnector::new(&connection_string, preview_features)
-            .await
-            .unwrap();
+        let provider = args.provider();
+
+        dbg!(args.database_url());
+
+        let datamodel = formatdoc! {r#"
+            datasource db {{
+              provider = "{provider}"
+              url = "{connection_string}"
+            }}
+        "#};
+
+        let api = migration_core::migration_api(Some(datamodel), None).unwrap();
 
         TestApi {
             api,
@@ -102,10 +111,6 @@ impl TestApi {
         &self.connection_string
     }
 
-    pub async fn list_databases(&self) -> Result<Vec<String>> {
-        Ok(self.api.list_databases().await?)
-    }
-
     pub fn database(&self) -> &Quaint {
         &self.database
     }
@@ -114,10 +119,10 @@ impl TestApi {
         let previous_schema = psl::validate(self.pure_config().into());
         let introspection_result = self.test_introspect_internal(previous_schema, true).await?;
 
-        Ok(introspection_result.data_model)
+        Ok(introspection_result.datamodel)
     }
 
-    pub async fn introspect_views(&self) -> Result<Option<Vec<ViewDefinition>>> {
+    pub async fn introspect_views(&self) -> Result<Option<Vec<IntrospectionView>>> {
         let previous_schema = psl::validate(self.pure_config().into());
         let introspection_result = self.test_introspect_internal(previous_schema, true).await?;
 
@@ -128,7 +133,7 @@ impl TestApi {
         let previous_schema = psl::validate(self.pure_config().into());
         let introspection_result = self.test_introspect_internal(previous_schema, false).await?;
 
-        Ok(introspection_result.data_model)
+        Ok(introspection_result.datamodel)
     }
 
     pub fn is_cockroach(&self) -> bool {
@@ -156,12 +161,24 @@ impl TestApi {
         &self,
         previous_schema: psl::ValidatedSchema,
         render_config: bool,
-    ) -> ConnectorResult<IntrospectionResult> {
+    ) -> migration_connector::ConnectorResult<IntrospectResult> {
+        let schema = previous_schema.db.source().to_string();
+
+        let connection_string = format!(r#""{}""#, self.connection_string());
+        let schema = schema.replace(r#"env("TEST_DATABASE_URL")"#, &connection_string);
+
         let mut ctx = IntrospectionContext::new(previous_schema, CompositeTypeDepth::Infinite, None);
         ctx.render_config = render_config;
 
+        let params = IntrospectParams {
+            composite_type_depth: -1,
+            force: false,
+            schema,
+            schemas: None,
+        };
+
         self.api
-            .introspect(&ctx)
+            .introspect(params)
             .instrument(tracing::info_span!("introspect"))
             .await
     }
@@ -172,7 +189,7 @@ impl TestApi {
         let schema = parse_datamodel(&schema);
         let introspection_result = self.test_introspect_internal(schema, true).await?;
 
-        Ok(introspection_result.data_model)
+        Ok(introspection_result.datamodel)
     }
 
     #[tracing::instrument(skip(self, data_model_string))]
@@ -180,7 +197,7 @@ impl TestApi {
         let data_model = parse_datamodel(&format!("{}{}", self.pure_config(), data_model_string));
         let introspection_result = self.test_introspect_internal(data_model, false).await?;
 
-        Ok(introspection_result.data_model)
+        Ok(introspection_result.datamodel)
     }
 
     #[tracing::instrument(skip(self, data_model_string))]
@@ -188,7 +205,7 @@ impl TestApi {
         let data_model = parse_datamodel(data_model_string);
         let introspection_result = self.test_introspect_internal(data_model, true).await?;
 
-        Ok(introspection_result.data_model)
+        Ok(introspection_result.datamodel)
     }
 
     pub async fn re_introspect_warnings(&self, data_model_string: &str) -> Result<String> {
@@ -202,7 +219,15 @@ impl TestApi {
         let previous_schema = psl::validate(self.pure_config().into());
         let introspection_result = self.test_introspect_internal(previous_schema, false).await?;
 
-        Ok(introspection_result.version)
+        let version = match introspection_result.version.as_str() {
+            "NonPrisma" => Version::NonPrisma,
+            "Prisma1" => Version::Prisma1,
+            "Prisma11" => Version::Prisma11,
+            "Prisma2" => Version::Prisma2,
+            ver => panic!("Unknown version: {}", ver),
+        };
+
+        Ok(version)
     }
 
     pub async fn introspection_warnings(&self) -> Result<String> {
@@ -212,16 +237,8 @@ impl TestApi {
         Ok(serde_json::to_string(&introspection_result.warnings)?)
     }
 
-    pub async fn get_metadata(&self) -> Result<DatabaseMetadata> {
-        Ok(self.api.get_metadata().await?)
-    }
-
-    pub async fn get_database_description(&self) -> Result<String> {
-        Ok(self.api.get_database_description().await?)
-    }
-
     pub async fn get_database_version(&self) -> Result<String> {
-        Ok(self.api.get_database_version().await?)
+        Ok(self.api.version().await?)
     }
 
     pub fn sql_family(&self) -> SqlFamily {
@@ -265,7 +282,7 @@ impl TestApi {
             ""
         };
 
-        let namespaces: Vec<String> = self.namespaces().iter().map(|ns| format!(r#""{ns}""#)).collect();
+        let namespaces: Vec<String> = self.namespaces().iter().map(|ns| format!(r#""{ns}""#,)).collect();
 
         let namespaces = if namespaces.is_empty() {
             "".to_string()
@@ -277,16 +294,16 @@ impl TestApi {
         let datasource_block = format!(
             r#"datasource db {{
                  provider = "{}"
-                 url = "{}"{}{}
+                 url = {}{}{}
                }}"#,
-            provider, "env(TEST_DATABASE_URL)", namespaces, relation_mode
+            provider, r#"env("TEST_DATABASE_URL")"#, namespaces, relation_mode
         );
         datasource_block
     }
 
     pub fn datasource_block(&self) -> DatasourceBlock<'_> {
         self.args.datasource_block(
-            "env(TEST_DATABASE_URL)",
+            r#"env("TEST_DATABASE_URL")"#,
             if self.is_vitess() {
                 &[("relationMode", r#""prisma""#)]
             } else {
@@ -339,7 +356,7 @@ impl TestApi {
         let data_model = parse_datamodel(&format!("{}{}", self.pure_config(), schema));
         let reintrospected = self.test_introspect_internal(data_model, false).await.unwrap();
 
-        expectation.assert_eq(&reintrospected.data_model);
+        expectation.assert_eq(&reintrospected.datamodel);
     }
 
     pub async fn expect_re_introspect_warnings(&self, schema: &str, expectation: expect_test::Expect) {

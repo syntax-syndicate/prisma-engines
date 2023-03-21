@@ -1,5 +1,7 @@
 mod error;
 
+use std::str::FromStr;
+
 pub use error::{ConnectorError, ErrorKind};
 
 use enumflags2::BitFlags;

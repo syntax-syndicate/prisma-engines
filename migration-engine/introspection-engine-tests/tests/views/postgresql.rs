@@ -23,7 +23,7 @@ async fn preview_feature_is_required(api: &TestApi) -> TestResult {
 
         datasource db {
           provider = "postgresql"
-          url      = "env(TEST_DATABASE_URL)"
+          url      = env("TEST_DATABASE_URL")
         }
 
         model User {
@@ -61,7 +61,7 @@ async fn simple_view_from_one_table(api: &TestApi) -> TestResult {
 
         datasource db {
           provider = "postgresql"
-          url      = "env(TEST_DATABASE_URL)"
+          url      = env("TEST_DATABASE_URL")
         }
 
         model User {
@@ -144,7 +144,7 @@ async fn simple_view_from_two_tables(api: &TestApi) -> TestResult {
 
         datasource db {
           provider = "postgresql"
-          url      = "env(TEST_DATABASE_URL)"
+          url      = env("TEST_DATABASE_URL")
         }
 
         model Profile {
@@ -688,7 +688,7 @@ async fn reserved_name_gets_mapped(api: &TestApi) -> TestResult {
 
         datasource db {
           provider = "postgresql"
-          url      = "env(TEST_DATABASE_URL)"
+          url      = env("TEST_DATABASE_URL")
         }
 
         /// This view has been renamed to 'Renamedif' during introspection, because the original name 'if' is reserved.
@@ -864,7 +864,7 @@ async fn schema_is_introspected(api: &TestApi) -> TestResult {
 
         datasource db {
           provider = "postgresql"
-          url      = "env(TEST_DATABASE_URL)"
+          url      = env("TEST_DATABASE_URL")
           schemas  = ["public"]
         }
 
@@ -983,7 +983,7 @@ async fn invalid_field_names_trigger_warnings(api: &TestApi) -> TestResult {
 
         datasource db {
           provider = "postgresql"
-          url      = "env(TEST_DATABASE_URL)"
+          url      = env("TEST_DATABASE_URL")
         }
 
         /// The underlying view does not contain a valid unique identifier and can therefore currently not be handled by the Prisma Client.
@@ -1049,7 +1049,7 @@ async fn dupes_are_renamed(api: &TestApi) -> TestResult {
 
         datasource db {
           provider = "postgresql"
-          url      = "env(TEST_DATABASE_URL)"
+          url      = env("TEST_DATABASE_URL")
           schemas  = ["private", "public"]
         }
 
@@ -1127,7 +1127,7 @@ async fn dupe_views_are_not_considered_without_preview_feature(api: &TestApi) ->
 
         datasource db {
           provider = "postgresql"
-          url      = "env(TEST_DATABASE_URL)"
+          url      = env("TEST_DATABASE_URL")
           schemas  = ["private", "public"]
         }
 
