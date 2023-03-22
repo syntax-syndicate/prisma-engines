@@ -273,7 +273,6 @@ docker-image:
 CMD ?= bash
 run-docker: docker-image
 	docker run \
-		-v /nix:/nix \
 		-v $(shell pwd):/engines \
 		-v $(shell pwd)/client:/client \
 		-v $(HOME)/node:/node \
