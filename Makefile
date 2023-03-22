@@ -286,8 +286,11 @@ run-docker: docker-image
 build-docker:
 	$(MAKE) run-docker CMD="bash -c 'cd /engines && make qe-node-api'"
 
-build-node-docker:
+build-node-docker: $(HOME)/node
 	$(MAKE) run-docker CMD="bash -c 'cd /node && ./configure --debug && make -j12'"
+
+$(HOME)/node:
+	git clone https://github.com/nodejs/node.git $@
 
 repro-docker:
 	$(MAKE) run-docker CMD="bash -c 'cd /client && make run'"
