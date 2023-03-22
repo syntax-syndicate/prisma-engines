@@ -265,7 +265,7 @@ qe-node-api: build target/debug/libquery_engine.node
 	if [[ "$$(uname -sm)" == "Darwin arm64" ]]; then rm -f $@; fi
 	cp $< $@
 
-.PHONY: docker-image run-docker build-docker build-node-docker rr-docker
+.PHONY: docker-image run-docker build-docker build-node-docker repro-docker rr-docker
 
 docker-image:
 	docker build -t rr -f Dockerfile .
@@ -288,6 +288,9 @@ build-docker:
 
 build-node-docker:
 	$(MAKE) run-docker CMD="bash -c 'cd /node && ./configure --debug && make -j12'"
+
+repro-docker:
+	$(MAKE) run-docker CMD="bash -c 'cd /client && make run'"
 
 rr-docker: # build-docker build-node-docker
 	$(MAKE) run-docker CMD="bash -c 'cd /client && make build && rr record /node/node_g index.js'"
