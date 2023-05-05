@@ -1,6 +1,9 @@
 use crate::{error::ApiError, log_callback::LogCallback, logger::Logger};
 use futures::FutureExt;
-use napi::{Env, JsFunction, JsUnknown};
+use napi::{
+    bindgen_prelude::{Buffer, Uint8Array},
+    Env, JsFunction, JsUnknown,
+};
 use napi_derive::napi;
 use psl::PreviewFeature;
 use query_core::{
@@ -17,6 +20,7 @@ use std::{
     future::Future,
     panic::AssertUnwindSafe,
     path::PathBuf,
+    str::from_utf8,
     sync::Arc,
 };
 use tokio::sync::RwLock;
@@ -102,7 +106,6 @@ impl ConnectedEngine {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ConstructorOptions {
-    datamodel: String,
     log_level: String,
     #[serde(default)]
     log_queries: bool,
@@ -139,12 +142,11 @@ impl Inner {
 impl QueryEngine {
     /// Parse a validated datamodel and configuration to allow connecting later on.
     #[napi(constructor)]
-    pub fn new(napi_env: Env, options: JsUnknown, callback: JsFunction) -> napi::Result<Self> {
+    pub fn new(napi_env: Env, datamodel: Buffer, options: JsUnknown, callback: JsFunction) -> napi::Result<Self> {
         let log_callback = LogCallback::new(napi_env, callback)?;
         log_callback.unref(&napi_env)?;
 
         let ConstructorOptions {
-            datamodel,
             log_level,
             log_queries,
             datasource_overrides,
@@ -156,7 +158,9 @@ impl QueryEngine {
 
         let env = stringify_env_values(env)?; // we cannot trust anything JS sends us from process.env
         let overrides: Vec<(_, _)> = datasource_overrides.into_iter().collect();
-        let mut schema = psl::validate(datamodel.into());
+
+        let datamodel_str = from_utf8(datamodel.as_ref()).unwrap();
+        let mut schema = psl::validate(datamodel_str.into());
         let config = &mut schema.configuration;
 
         schema
