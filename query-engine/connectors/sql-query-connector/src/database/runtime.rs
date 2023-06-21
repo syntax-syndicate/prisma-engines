@@ -6,6 +6,7 @@ use quaint::{
     prelude::{Query, Queryable, TransactionCapable},
     Value,
 };
+use tracing::{info_span, Instrument};
 
 #[cfg(feature = "js-drivers")]
 type QueryableRef = std::sync::Arc<dyn Queryable>;
@@ -54,7 +55,10 @@ impl Queryable for RuntimeConnection {
             Self::Rust(conn) => conn.query(q).await,
 
             #[cfg(feature = "js-drivers")]
-            Self::Js(conn) => conn.query(q).await,
+            Self::Js(conn) => {
+                let span = info_span!("runtime_connection::js::query", user_facing = true);
+                conn.query(q).instrument(span).await
+            }
         }
     }
 
@@ -63,7 +67,10 @@ impl Queryable for RuntimeConnection {
             Self::Rust(conn) => conn.query_raw(sql, params).await,
 
             #[cfg(feature = "js-drivers")]
-            Self::Js(conn) => conn.query_raw(sql, params).await,
+            Self::Js(conn) => {
+                let span = info_span!("runtime_connection::js::query_raw", user_facing = true);
+                conn.query_raw(sql, params).instrument(span).await
+            }
         }
     }
 
@@ -72,7 +79,10 @@ impl Queryable for RuntimeConnection {
             Self::Rust(conn) => conn.query_raw_typed(sql, params).await,
 
             #[cfg(feature = "js-drivers")]
-            Self::Js(conn) => conn.query_raw_typed(sql, params).await,
+            Self::Js(conn) => {
+                let span = info_span!("runtime_connection::js::query_raw_typed", user_facing = true);
+                conn.query_raw_typed(sql, params).instrument(span).await
+            }
         }
     }
 
@@ -81,7 +91,10 @@ impl Queryable for RuntimeConnection {
             Self::Rust(conn) => conn.execute(q).await,
 
             #[cfg(feature = "js-drivers")]
-            Self::Js(conn) => conn.execute(q).await,
+            Self::Js(conn) => {
+                let span = info_span!("runtime_connection::js::execute", user_facing = true);
+                conn.execute(q).instrument(span).await
+            }
         }
     }
 
@@ -90,7 +103,10 @@ impl Queryable for RuntimeConnection {
             Self::Rust(conn) => conn.execute_raw(sql, params).await,
 
             #[cfg(feature = "js-drivers")]
-            Self::Js(conn) => conn.execute_raw(sql, params).await,
+            Self::Js(conn) => {
+                let span = info_span!("runtime_connection::js::execute_raw", user_facing = true);
+                conn.execute_raw(sql, params).instrument(span).await
+            }
         }
     }
 
@@ -99,7 +115,10 @@ impl Queryable for RuntimeConnection {
             Self::Rust(conn) => conn.execute_raw_typed(sql, params).await,
 
             #[cfg(feature = "js-drivers")]
-            Self::Js(conn) => conn.execute_raw_typed(sql, params).await,
+            Self::Js(conn) => {
+                let span = info_span!("runtime_connection::js::execute_raw_typed", user_facing = true);
+                conn.execute_raw_typed(sql, params).instrument(span).await
+            }
         }
     }
 
@@ -110,7 +129,10 @@ impl Queryable for RuntimeConnection {
             Self::Rust(conn) => conn.raw_cmd(cmd).await,
 
             #[cfg(feature = "js-drivers")]
-            Self::Js(conn) => conn.raw_cmd(cmd).await,
+            Self::Js(conn) => {
+                let span = info_span!("runtime_connection::js::raw_cmd", user_facing = true);
+                conn.raw_cmd(cmd).instrument(span).await
+            }
         }
     }
 
@@ -119,7 +141,10 @@ impl Queryable for RuntimeConnection {
             Self::Rust(conn) => conn.version().await,
 
             #[cfg(feature = "js-drivers")]
-            Self::Js(conn) => conn.version().await,
+            Self::Js(conn) => {
+                let span = info_span!("runtime_connection::js::version", user_facing = true);
+                conn.version().instrument(span).await
+            }
         }
     }
 
@@ -128,7 +153,10 @@ impl Queryable for RuntimeConnection {
             Self::Rust(conn) => conn.is_healthy(),
 
             #[cfg(feature = "js-drivers")]
-            Self::Js(conn) => conn.is_healthy(),
+            Self::Js(conn) => {
+                let span = info_span!("runtime_connection::js::is_healthy", user_facing = true);
+                span.in_scope(|| conn.is_healthy())
+            }
         }
     }
 
@@ -139,7 +167,10 @@ impl Queryable for RuntimeConnection {
             Self::Rust(conn) => conn.set_tx_isolation_level(isolation_level).await,
 
             #[cfg(feature = "js-drivers")]
-            Self::Js(conn) => conn.set_tx_isolation_level(isolation_level).await,
+            Self::Js(conn) => {
+                let span = info_span!("runtime_connection::js::set_tx_isolation_level", user_facing = true);
+                conn.set_tx_isolation_level(isolation_level).instrument(span).await
+            }
         }
     }
 

@@ -6,6 +6,7 @@ use napi::JsObject;
 use napi_derive::napi;
 use quaint::connector::ResultSet as QuaintResultSet;
 use quaint::Value as QuaintValue;
+use tracing::Instrument;
 
 // Note: Every ThreadsafeFunction<T, ?> should have an explicit `ErrorStrategy::Fatal` set, as to avoid
 // "TypeError [ERR_INVALID_ARG_TYPE]: The first argument must be of type string or an instance of Buffer, ArrayBuffer, or Array or an Array-like Object. Received null".
@@ -144,19 +145,34 @@ impl From<JSResultSet> for QuaintResultSet {
 
 impl Driver {
     pub async fn query_raw(&self, params: Query) -> napi::Result<JSResultSet> {
-        let promise = self.query_raw.call_async::<JsPromise<JSResultSet>>(params).await?;
-        let value = promise.await?;
+        let span = tracing::trace_span!("driver::query_raw:call", user_facing = true);
+        let promise = self
+            .query_raw
+            .call_async::<JsPromise<JSResultSet>>(params)
+            .instrument(span)
+            .await?;
+
+        let span = tracing::trace_span!("driver::query_raw:await_promise", user_facing = true);
+        let value = promise.instrument(span).await?;
         Ok(value)
     }
 
     pub async fn execute_raw(&self, params: Query) -> napi::Result<u32> {
-        let promise = self.execute_raw.call_async::<JsPromise<u32>>(params).await?;
-        let value = promise.await?;
+        let span = tracing::trace_span!("driver::execute_raw:call", user_facing = true);
+        let promise = self
+            .execute_raw
+            .call_async::<JsPromise<u32>>(params)
+            .instrument(span)
+            .await?;
+
+        let span = tracing::trace_span!("driver::execute_raw:await_promise", user_facing = true);
+        let value = promise.instrument(span).await?;
         Ok(value)
     }
 
     pub async fn version(&self) -> napi::Result<Option<String>> {
-        let version = self.version.call_async::<Option<String>>(()).await?;
+        let span = tracing::trace_span!("driver::version:call", user_facing = true);
+        let version = self.version.call_async::<Option<String>>(()).instrument(span).await?;
         Ok(version)
     }
 

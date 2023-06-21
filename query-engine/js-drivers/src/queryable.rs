@@ -117,20 +117,20 @@ impl QuaintQueryable for JsQueryable {
 }
 
 impl JsQueryable {
-    async fn build_query(sql: &str, values: &[quaint::Value<'_>]) -> Query {
+    fn build_query(sql: &str, values: &[quaint::Value<'_>]) -> Query {
         let sql: String = sql.to_string();
         let args = values.iter().map(|v| v.clone().into()).collect();
         Query { sql, args }
     }
 
-    async fn transform_result_set(result_set: JSResultSet) -> quaint::Result<ResultSet> {
+    fn transform_result_set(result_set: JSResultSet) -> quaint::Result<ResultSet> {
         Ok(ResultSet::from(result_set))
     }
 
     async fn do_query_raw(&self, sql: &str, params: &[Value<'_>]) -> quaint::Result<ResultSet> {
         let len = params.len();
         let serialization_span = info_span!("js:query:args", user_facing = true, "length" = %len);
-        let query = Self::build_query(sql, params).instrument(serialization_span).await;
+        let query = serialization_span.in_scope(|| Self::build_query(sql, params));
 
         // Todo: convert napi::Error to quaint::error::Error.
         let sql_span = info_span!("js:query:sql", user_facing = true, "db.statement" = %sql);
@@ -138,15 +138,13 @@ impl JsQueryable {
 
         let len = result_set.len();
         let deserialization_span = info_span!("js:query:result", user_facing = true, "length" = %len);
-        Self::transform_result_set(result_set)
-            .instrument(deserialization_span)
-            .await
+        deserialization_span.in_scope(|| Self::transform_result_set(result_set))
     }
 
     async fn do_execute_raw(&self, sql: &str, params: &[Value<'_>]) -> quaint::Result<u64> {
         let len = params.len();
         let serialization_span = info_span!("js:query:args", user_facing = true, "length" = %len);
-        let query = Self::build_query(sql, params).instrument(serialization_span).await;
+        let query = serialization_span.in_scope(|| Self::build_query(sql, params));
 
         // Todo: convert napi::Error to quaint::error::Error.
         let sql_span = info_span!("js:query:sql", user_facing = true, "db.statement" = %sql);
