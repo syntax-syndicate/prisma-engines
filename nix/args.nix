@@ -5,7 +5,7 @@
       overlays = [
         flakeInputs.rust-overlay.overlays.default
         (self: super:
-          let toolchain = super.rust-bin.stable.latest; in
+          let toolchain = super.rust-bin.nightly."2023-06-20"; in
           { cargo = toolchain.minimal; rustc = toolchain.minimal; rustToolchain = toolchain; })
       ];
     in

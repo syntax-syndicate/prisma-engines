@@ -32,6 +32,9 @@ build:
 build-qe:
 	cargo build --package query-engine
 
+build-asan:
+	LDFLAGS=-fsanitize=address CFLAGS=-fsanitize=address CXXFLAGS=-fsanitize=address RUSTDOCFLAGS=-Zsanitizer=address RUSTFLAGS=-Zsanitizer=address cargo build -Zbuild-std --target aarch64-unknown-linux-gnu --release -p query-engine-node-api
+
 # Emulate pedantic CI compilation.
 pedantic:
 	RUSTFLAGS="-D warnings" cargo fmt -- --check && RUSTFLAGS="-D warnings" cargo clippy --all-targets
