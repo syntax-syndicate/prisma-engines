@@ -85,3 +85,6 @@ opt-level = 's' # Optimize for size.
 [profile.profiling]
 inherits = "release"
 debug = true
+
+[patch.crates-io]
+tonic = { git = "https://github.com/hyperium/tonic" }
