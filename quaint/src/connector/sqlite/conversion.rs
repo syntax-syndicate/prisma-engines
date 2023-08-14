@@ -9,7 +9,7 @@ use crate::{
     error::{Error, ErrorKind},
 };
 
-use libsql::{Column, Error as RusqlError, Null, Row as SqliteRow, Rows as SqliteRows, ToSql, ToSqlOutput, ValueRef};
+use libsql::{Column, Error as LibsqlError, Row as LibsqlRow, Rows as SqliteRows, ToSql, ToSqlOutput, Value as LibsqlValue, ValueRef};
 
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
@@ -127,7 +127,7 @@ impl TypeIdentifier for Column<'_> {
     }
 }
 
-impl<'a> GetRow for SqliteRow<'a> {
+impl<'a> GetRow for LibsqlRow {
     fn get_result_row(&self) -> crate::Result<Vec<Value<'static>>> {
         let statement = self.as_ref();
         let mut row = Vec::with_capacity(statement.columns().len());
@@ -237,7 +237,7 @@ impl<'a> GetRow for SqliteRow<'a> {
     }
 }
 
-impl<'a> ToColumnNames for SqliteRows<'a> {
+impl<'a> ToColumnNames for SqliteRows {
     fn to_column_names(&self) -> Vec<String> {
         match self.as_ref() {
             Some(statement) => statement.column_names().into_iter().map(|c| c.into()).collect(),
@@ -247,7 +247,7 @@ impl<'a> ToColumnNames for SqliteRows<'a> {
 }
 
 impl<'a> ToSql for Value<'a> {
-    fn to_sql(&self) -> Result<ToSqlOutput, RusqlError> {
+    fn to_sql(&self) -> Result<ToSqlOutput, LibsqlError> {
         let value = match self {
             Value::Int32(integer) => integer.map(ToSqlOutput::from),
             Value::Int64(integer) => integer.map(ToSqlOutput::from),
@@ -265,7 +265,7 @@ impl<'a> ToSql for Value<'a> {
                 let mut builder = Error::builder(kind);
                 builder.set_original_message(msg);
 
-                return Err(RusqlError::ToSqlConversionFailure(Box::new(builder.build())));
+                return Err(LibsqlError::ToSqlConversionFailure(Box::new(builder.build())));
             }
             #[cfg(feature = "bigdecimal")]
             Value::Numeric(d) => d
@@ -274,7 +274,7 @@ impl<'a> ToSql for Value<'a> {
             #[cfg(feature = "json")]
             Value::Json(value) => value.as_ref().map(|value| {
                 let stringified = serde_json::to_string(value)
-                    .map_err(|err| RusqlError::ToSqlConversionFailure(Box::new(err)))
+                    .map_err(|err| LibsqlError::ToSqlConversionFailure(Box::new(err)))
                     .unwrap();
 
                 ToSqlOutput::from(stringified)
@@ -300,7 +300,7 @@ impl<'a> ToSql for Value<'a> {
 
         match value {
             Some(value) => Ok(value),
-            None => Ok(ToSqlOutput::from(Null)),
+            None => Ok(ToSqlOutput::from(LibsqlValue::Null)),
         }
     }
 }
