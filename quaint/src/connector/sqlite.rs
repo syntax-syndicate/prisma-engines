@@ -1,7 +1,7 @@
 mod conversion;
 mod error;
 
-pub use rusqlite::{params_from_iter, version as sqlite_version};
+pub use libsql::{params_from_iter, version as sqlite_version};
 
 use super::IsolationLevel;
 use crate::{
@@ -18,12 +18,13 @@ pub(crate) const DEFAULT_SQLITE_SCHEMA_NAME: &str = "main";
 
 /// The underlying sqlite driver. Only available with the `expose-drivers` Cargo feature.
 #[cfg(feature = "expose-drivers")]
-pub use rusqlite;
+pub use libsql;
 
 /// A connector interface for the SQLite database
 #[cfg_attr(feature = "docs", doc(cfg(feature = "sqlite")))]
 pub struct Sqlite {
-    pub(crate) client: Mutex<rusqlite::Connection>,
+    db: libsql::Database,
+    pub(crate) client: Mutex<libsql::Connection>,
 }
 
 /// Wraps a connection url and exposes the parsing logic used by Quaint,
@@ -133,7 +134,8 @@ impl TryFrom<&str> for Sqlite {
         let params = SqliteParams::try_from(path)?;
         let file_path = params.file_path;
 
-        let conn = rusqlite::Connection::open(file_path.as_str())?;
+        let db = libsql::Database::open(file_path);
+        let conn = db.connect()?;
 
         if let Some(timeout) = params.socket_timeout {
             conn.busy_timeout(timeout)?;
@@ -141,7 +143,7 @@ impl TryFrom<&str> for Sqlite {
 
         let client = Mutex::new(conn);
 
-        Ok(Sqlite { client })
+        Ok(Sqlite { db, client })
     }
 }
 
@@ -152,17 +154,14 @@ impl Sqlite {
 
     /// Open a new SQLite database in memory.
     pub fn new_in_memory() -> crate::Result<Sqlite> {
-        let client = rusqlite::Connection::open_in_memory()?;
-
-        Ok(Sqlite {
-            client: Mutex::new(client),
-        })
+        // TODO(libsql): Connection::open_in_memory
+        Self::new(":memory:")
     }
 
     /// The underlying rusqlite::Connection. Only available with the `expose-drivers` Cargo
     /// feature. This is a lower level API when you need to get into database specific features.
     #[cfg(feature = "expose-drivers")]
-    pub fn connection(&self) -> &Mutex<rusqlite::Connection> {
+    pub fn connection(&self) -> &Mutex<libsql::Connection> {
         &self.client
     }
 }
@@ -230,7 +229,7 @@ impl Queryable for Sqlite {
     }
 
     async fn version(&self) -> crate::Result<Option<String>> {
-        Ok(Some(rusqlite::version().into()))
+        Ok(Some(libsql::version().into()))
     }
 
     fn is_healthy(&self) -> bool {

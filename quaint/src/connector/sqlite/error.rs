@@ -1,21 +1,22 @@
 use crate::error::*;
-use rusqlite::ffi;
-use rusqlite::types::FromSqlError;
+use libsql::ffi;
+// use libsql::types::FromSqlError;
 
-impl From<rusqlite::Error> for Error {
-    fn from(e: rusqlite::Error) -> Error {
+impl From<libsql::Error> for Error {
+    fn from(e: libsql::Error) -> Error {
         match e {
-            rusqlite::Error::ToSqlConversionFailure(error) => match error.downcast::<Error>() {
-                Ok(error) => *error,
-                Err(error) => {
-                    let mut builder = Error::builder(ErrorKind::QueryError(error));
+            // libsql::Error::ToSqlConversionFailure(error) => match error.downcast::<Error>() {
+            //     Ok(error) => *error,
+            //     Err(error) => {
+            //         let mut builder = Error::builder(ErrorKind::QueryError(error));
 
-                    builder.set_original_message("Could not interpret parameters in an SQLite query.");
+            //         builder.set_original_message("Could not interpret parameters in an SQLite query.");
 
-                    builder.build()
-                }
-            },
-            rusqlite::Error::InvalidQuery => {
+            //         builder.build()
+            //     }
+            // },
+
+            libsql::Error::InvalidQuery => {
                 let mut builder = Error::builder(ErrorKind::QueryError(e.into()));
 
                 builder.set_original_message(
@@ -24,22 +25,17 @@ impl From<rusqlite::Error> for Error {
 
                 builder.build()
             }
-            rusqlite::Error::ExecuteReturnedResults => {
+
+            libsql::Error::ExecuteReturnedResults => {
                 let mut builder = Error::builder(ErrorKind::QueryError(e.into()));
                 builder.set_original_message("Execute returned results, which is not allowed in SQLite.");
 
                 builder.build()
             }
 
-            rusqlite::Error::QueryReturnedNoRows => Error::builder(ErrorKind::NotFound).build(),
+            libsql::Error::QueryReturnedNoRows => Error::builder(ErrorKind::NotFound).build(),
 
-            rusqlite::Error::SqliteFailure(
-                ffi::Error {
-                    code: ffi::ErrorCode::ConstraintViolation,
-                    extended_code: 2067,
-                },
-                Some(description),
-            ) => {
+            libsql::Error::LibError(2067, description) => {
                 let constraint = description
                     .split(": ")
                     .nth(1)
@@ -57,13 +53,7 @@ impl From<rusqlite::Error> for Error {
                 builder.build()
             }
 
-            rusqlite::Error::SqliteFailure(
-                ffi::Error {
-                    code: ffi::ErrorCode::ConstraintViolation,
-                    extended_code: 1555,
-                },
-                Some(description),
-            ) => {
+            libsql::Error::LibError(1555, description) => {
                 let constraint = description
                     .split(": ")
                     .nth(1)
@@ -81,13 +71,7 @@ impl From<rusqlite::Error> for Error {
                 builder.build()
             }
 
-            rusqlite::Error::SqliteFailure(
-                ffi::Error {
-                    code: ffi::ErrorCode::ConstraintViolation,
-                    extended_code: 1299,
-                },
-                Some(description),
-            ) => {
+            libsql::Error::LibError(1299, description) => {
                 let constraint = description
                     .split(": ")
                     .nth(1)
@@ -105,13 +89,7 @@ impl From<rusqlite::Error> for Error {
                 builder.build()
             }
 
-            rusqlite::Error::SqliteFailure(
-                ffi::Error {
-                    code: ffi::ErrorCode::ConstraintViolation,
-                    extended_code: 787,
-                },
-                Some(description),
-            ) => {
+            libsql::Error::LibError(787, description) => {
                 let mut builder = Error::builder(ErrorKind::ForeignKeyConstraintViolation {
                     constraint: DatabaseConstraint::ForeignKey,
                 });
@@ -122,13 +100,7 @@ impl From<rusqlite::Error> for Error {
                 builder.build()
             }
 
-            rusqlite::Error::SqliteFailure(
-                ffi::Error {
-                    code: ffi::ErrorCode::ConstraintViolation,
-                    extended_code: 1811,
-                },
-                Some(description),
-            ) => {
+            libsql::Error::LibError(1811, description) => {
                 let mut builder = Error::builder(ErrorKind::ForeignKeyConstraintViolation {
                     constraint: DatabaseConstraint::ForeignKey,
                 });
@@ -139,13 +111,9 @@ impl From<rusqlite::Error> for Error {
                 builder.build()
             }
 
-            rusqlite::Error::SqliteFailure(
-                ffi::Error {
-                    code: ffi::ErrorCode::DatabaseBusy,
-                    extended_code,
-                },
-                description,
-            ) => {
+            // TODO(libsql): exposing both primary and extended_code and representing primary codes
+            // as a Rust enum for easy matching.
+            libsql::Error::LibError(extended_code, description) if extended_code & 0xff == ffi::SQLITE_BUSY => {
                 let mut builder = Error::builder(ErrorKind::SocketTimeout);
                 builder.set_original_code(format!("{extended_code}"));
 
@@ -156,8 +124,8 @@ impl From<rusqlite::Error> for Error {
                 builder.build()
             }
 
-            rusqlite::Error::SqliteFailure(ffi::Error { extended_code, .. }, ref description) => match description {
-                Some(d) if d.starts_with("no such table") => {
+            libsql::Error::LibError(extended_code, description) => match description {
+                d if d.starts_with("no such table") => {
                     let table = d.split(": ").last().into();
                     let kind = ErrorKind::TableDoesNotExist { table };
 
@@ -167,7 +135,7 @@ impl From<rusqlite::Error> for Error {
 
                     builder.build()
                 }
-                Some(d) if d.contains("has no column named") => {
+                d if d.contains("has no column named") => {
                     let column = d.split(" has no column named ").last().into();
                     let kind = ErrorKind::ColumnNotFound { column };
 
@@ -177,7 +145,7 @@ impl From<rusqlite::Error> for Error {
 
                     builder.build()
                 }
-                Some(d) if d.starts_with("no such column: ") => {
+                d if d.starts_with("no such column: ") => {
                     let column = d.split("no such column: ").last().into();
                     let kind = ErrorKind::ColumnNotFound { column };
 
@@ -200,38 +168,13 @@ impl From<rusqlite::Error> for Error {
                 }
             },
 
-            rusqlite::Error::SqlInputError {
-                error: ffi::Error { extended_code, .. },
-                ref msg,
-                ..
-            } => match msg {
-                d if d.starts_with("no such column: ") => {
-                    let column = d.split("no such column: ").last().into();
-                    let kind = ErrorKind::ColumnNotFound { column };
-
-                    let mut builder = Error::builder(kind);
-                    builder.set_original_code(extended_code.to_string());
-                    builder.set_original_message(d);
-
-                    builder.build()
-                }
-                _ => {
-                    let description = msg.clone();
-                    let mut builder = Error::builder(ErrorKind::QueryError(e.into()));
-                    builder.set_original_code(extended_code.to_string());
-                    builder.set_original_message(description);
-
-                    builder.build()
-                }
-            },
-
             e => Error::builder(ErrorKind::QueryError(e.into())).build(),
         }
     }
 }
 
-impl From<FromSqlError> for Error {
-    fn from(e: FromSqlError) -> Error {
-        Error::builder(ErrorKind::ColumnReadFailure(e.into())).build()
-    }
-}
+// impl From<FromSqlError> for Error {
+//     fn from(e: FromSqlError) -> Error {
+//         Error::builder(ErrorKind::ColumnReadFailure(e.into())).build()
+//     }
+// }

@@ -9,10 +9,7 @@ use crate::{
     error::{Error, ErrorKind},
 };
 
-use rusqlite::{
-    types::{Null, ToSql, ToSqlOutput, ValueRef},
-    Column, Error as RusqlError, Row as SqliteRow, Rows as SqliteRows,
-};
+use libsql::{Column, Error as RusqlError, Null, Row as SqliteRow, Rows as SqliteRows, ToSql, ToSqlOutput, ValueRef};
 
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
