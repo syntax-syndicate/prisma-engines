@@ -262,7 +262,7 @@ impl<'a> TryInto<LibsqlValue> for Value<'a> {
             // TODO(libsql): From implementation for bool
             Value::Boolean(boo) => boo.map(|b| LibsqlValue::Integer(b as i64)).map(Ok),
             // TODO(libsql): From implementation for u8
-            Value::Char(c) => c.map(|c| LibsqlValue::Integer(c as u8)).map(Ok),
+            Value::Char(c) => c.map(|c| LibsqlValue::Integer(c as i64)).map(Ok),
             // TODO(libsql): important: this clones the bytes, rusqlite retained a reference via ValueRef
             Value::Bytes(bytes) => bytes.as_ref().map(|bytes| LibsqlValue::from(bytes.to_vec())).map(Ok),
             Value::Array(_) => {
