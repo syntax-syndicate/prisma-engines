@@ -133,7 +133,10 @@ impl<'a> GetRow for LibsqlRow {
         let mut row = Vec::with_capacity(statement.columns().len());
 
         for (i, column) in statement.columns().iter().enumerate() {
-            let pv = match self.get_ref_unwrap(i) {
+            // TODO(libsql): missing `Row::get_ref_unwrap`
+            // TODO(libsql): in rusqlite this method is generic and accepts `usize` via `RowIndex`
+            // trait, here we have to cast
+            let pv = match self.get_ref(i as i32).unwrap() {
                 ValueRef::Null => match column {
                     // NOTE: A value without decl_type would be Int32(None)
                     c if c.is_int32() | c.is_null() => Value::Int32(None),
