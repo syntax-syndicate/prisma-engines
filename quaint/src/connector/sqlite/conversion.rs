@@ -9,7 +9,7 @@ use crate::{
     error::{Error, ErrorKind},
 };
 
-use libsql::{Column, Error as LibsqlError, Row as LibsqlRow, Rows as SqliteRows, ToSql, ToSqlOutput, Value as LibsqlValue, ValueRef};
+use libsql::{Column, Row as LibsqlRow, Rows as SqliteRows, Value as LibsqlValue, ValueRef};
 
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
@@ -246,18 +246,28 @@ impl<'a> ToColumnNames for SqliteRows {
     }
 }
 
-impl<'a> ToSql for Value<'a> {
-    fn to_sql(&self) -> Result<ToSqlOutput, LibsqlError> {
+impl<'a> TryInto<LibsqlValue> for Value<'a> {
+    type Error = Error;
+
+    fn try_into(self) -> Result<LibsqlValue, Self::Error> {
         let value = match self {
-            Value::Int32(integer) => integer.map(ToSqlOutput::from),
-            Value::Int64(integer) => integer.map(ToSqlOutput::from),
-            Value::Float(float) => float.map(|f| f as f64).map(ToSqlOutput::from),
-            Value::Double(double) => double.map(ToSqlOutput::from),
-            Value::Text(cow) => cow.as_ref().map(|cow| ToSqlOutput::from(cow.as_ref())),
-            Value::Enum(cow) => cow.as_ref().map(|cow| ToSqlOutput::from(cow.as_ref())),
-            Value::Boolean(boo) => boo.map(ToSqlOutput::from),
-            Value::Char(c) => c.map(|c| ToSqlOutput::from(c as u8)),
-            Value::Bytes(bytes) => bytes.as_ref().map(|bytes| ToSqlOutput::from(bytes.as_ref())),
+            Value::Int32(integer) => integer.map(LibsqlValue::from),
+            // TODO(libsql): From implementation for i64
+            Value::Int64(integer) => integer.map(LibsqlValue::Integer),
+            // TODO(libsql): From implementation for f32
+            Value::Float(float) => float.map(|f| f as f64).map(LibsqlValue::Real),
+            // TODO(libsql): From implementation for f64
+            Value::Double(double) => double.map(LibsqlValue::Real),
+            // TODO(libsql): important: this clones the string, rusqlite retained a reference via ValueRef
+            Value::Text(cow) => cow.as_ref().map(|cow| LibsqlValue::from(cow.as_ref())),
+            // TODO(libsql): important: this clones the string, rusqlite retained a reference via ValueRef
+            Value::Enum(cow) => cow.as_ref().map(|cow| LibsqlValue::from(cow.as_ref())),
+            // TODO(libsql): From implementation for bool
+            Value::Boolean(boo) => boo.map(|b| LibsqlValue::Integer(b as i64)),
+            // TODO(libsql): From implementation for u8
+            Value::Char(c) => c.map(|c| LibsqlValue::Integer(c as u8)),
+            // TODO(libsql): important: this clones the bytes, rusqlite retained a reference via ValueRef
+            Value::Bytes(bytes) => bytes.as_ref().map(|bytes| LibsqlValue::from(bytes.to_vec())),
             Value::Array(_) => {
                 let msg = "Arrays are not supported in SQLite.";
                 let kind = ErrorKind::conversion(msg);
@@ -265,29 +275,41 @@ impl<'a> ToSql for Value<'a> {
                 let mut builder = Error::builder(kind);
                 builder.set_original_message(msg);
 
-                return Err(LibsqlError::ToSqlConversionFailure(Box::new(builder.build())));
+                return Err(builder.build());
             }
             #[cfg(feature = "bigdecimal")]
-            Value::Numeric(d) => d
-                .as_ref()
-                .map(|d| ToSqlOutput::from(d.to_string().parse::<f64>().expect("BigDecimal is not a f64."))),
+            Value::Numeric(d) => d.as_ref().map(|d| {
+                // TODO(libsql): From implementation for f64
+                LibsqlValue::Real(d.to_string().parse::<f64>().map_err(|err| {
+                    Error::builder(ErrorKind::conversion("BigDecimal is not a f64."))
+                        .set_original_message(err.to_string())
+                        .build()
+                })?)
+            }),
             #[cfg(feature = "json")]
             Value::Json(value) => value.as_ref().map(|value| {
-                let stringified = serde_json::to_string(value)
-                    .map_err(|err| LibsqlError::ToSqlConversionFailure(Box::new(err)))
-                    .unwrap();
-
-                ToSqlOutput::from(stringified)
+                // TODO(libsql): From implementation for String
+                LibsqlValue::Text(serde_json::to_string(value).map_err(|err| {
+                    Error::builder(
+                        ErrorKind::conversion("JSON serialization error")
+                            .set_original_message(err.to_string())
+                            .build(),
+                    )
+                })?)
             }),
-            Value::Xml(cow) => cow.as_ref().map(|cow| ToSqlOutput::from(cow.as_ref())),
+            // TODO(libsql): important: this clones the string, rusqlite retained a reference via ValueRef
+            Value::Xml(cow) => cow.as_ref().map(|cow| LibsqlValue::from(cow.as_ref())),
             #[cfg(feature = "uuid")]
-            Value::Uuid(value) => value.map(|value| ToSqlOutput::from(value.hyphenated().to_string())),
+            // TODO(libsql): From implementation for String
+            Value::Uuid(value) => value.map(|value| LibsqlValue::Text(value.hyphenated().to_string())),
             #[cfg(feature = "chrono")]
-            Value::DateTime(value) => value.map(|value| ToSqlOutput::from(value.timestamp_millis())),
+            // TODO(libsql): From implementation for i64
+            Value::DateTime(value) => value.map(|value| LibsqlValue::Integer(value.timestamp_millis())),
             #[cfg(feature = "chrono")]
             Value::Date(date) => date
                 .and_then(|date| date.and_hms_opt(0, 0, 0))
-                .map(|dt| ToSqlOutput::from(dt.timestamp_millis())),
+                // TODO(libsql): From implementation for i64
+                .map(|dt| LibsqlValue::Integer(dt.timestamp_millis())),
             #[cfg(feature = "chrono")]
             Value::Time(time) => time
                 .and_then(|time| chrono::NaiveDate::from_ymd_opt(1970, 1, 1).map(|d| (d, time)))
@@ -295,12 +317,13 @@ impl<'a> ToSql for Value<'a> {
                     use chrono::Timelike;
                     date.and_hms_opt(time.hour(), time.minute(), time.second())
                 })
-                .map(|dt| ToSqlOutput::from(dt.timestamp_millis())),
+                // TODO(libsql): From implementation for i64
+                .map(|dt| LibsqlValue::Integer(dt.timestamp_millis())),
         };
 
         match value {
             Some(value) => Ok(value),
-            None => Ok(ToSqlOutput::from(LibsqlValue::Null)),
+            None => Ok(LibsqlValue::from(LibsqlValue::Null)),
         }
     }
 }

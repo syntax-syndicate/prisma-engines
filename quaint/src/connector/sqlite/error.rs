@@ -5,16 +5,16 @@ use libsql::ffi;
 impl From<libsql::Error> for Error {
     fn from(e: libsql::Error) -> Error {
         match e {
-            // libsql::Error::ToSqlConversionFailure(error) => match error.downcast::<Error>() {
-            //     Ok(error) => *error,
-            //     Err(error) => {
-            //         let mut builder = Error::builder(ErrorKind::QueryError(error));
+            libsql::Error::ToSqlConversionFailure(error) => match error.downcast::<Error>() {
+                Ok(error) => *error,
+                Err(error) => {
+                    let mut builder = Error::builder(ErrorKind::QueryError(error));
 
-            //         builder.set_original_message("Could not interpret parameters in an SQLite query.");
+                    builder.set_original_message("Could not interpret parameters in an SQLite query.");
 
-            //         builder.build()
-            //     }
-            // },
+                    builder.build()
+                }
+            },
 
             libsql::Error::InvalidQuery => {
                 let mut builder = Error::builder(ErrorKind::QueryError(e.into()));
