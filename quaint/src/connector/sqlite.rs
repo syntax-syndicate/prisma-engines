@@ -139,9 +139,29 @@ impl TryFrom<&str> for Sqlite {
         let conn = db.connect()?;
 
         // TODO(libsql): important: busy_timeout is not available
+        //
         // if let Some(timeout) = params.socket_timeout {
         //     conn.busy_timeout(timeout)?;
         // };
+        //
+        // Without this, 20 tests fail in quaint (and probably many more would fail in the engines
+        // themselves).
+        //
+        // The following workaround is functionally equivalent (including the default
+        // timeout in rusqlite) but it's a bit better to use the `sqlite3_busy_timeout` function
+        // rather than issue the pragma statement.
+        {
+            let timeout = params
+                .socket_timeout
+                .map(|duration| duration.as_millis())
+                .unwrap_or(5000);
+            // Note: PRAGMA statements cannot have parameters (it's a syntax error to write `PRAGMA
+            // busy_timeout = ?` in a prepared statement), only the corresponding PRAGMA functions
+            // can (though in the case of `SELECT * from pragma_busy_timeout` specifically there's
+            // no argument to parametrize), but they only allow reading, not modifying information.
+            // So we have to resort to formatting the query like this.
+            conn.query(format!("PRAGMA busy_timeout({timeout})"), libsql::params![])?;
+        }
 
         let client = Mutex::new(conn);
 
