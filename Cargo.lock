@@ -2144,7 +2144,7 @@ dependencies = [
 [[package]]
 name = "libsql"
 version = "0.1.6"
-source = "git+https://github.com/libsql/libsql#ea165beaaf9f8ef1cb13a288cb77e0fab54a242b"
+source = "git+https://github.com/libsql/libsql#417f64cd26b8696832af56ee6daa67140857cf1d"
 dependencies = [
  "futures",
  "libsql-sys",
@@ -2159,7 +2159,7 @@ dependencies = [
 [[package]]
 name = "libsql-sys"
 version = "0.2.11"
-source = "git+https://github.com/libsql/libsql#ea165beaaf9f8ef1cb13a288cb77e0fab54a242b"
+source = "git+https://github.com/libsql/libsql#417f64cd26b8696832af56ee6daa67140857cf1d"
 dependencies = [
  "bindgen 0.66.1",
  "cc",
@@ -2171,7 +2171,7 @@ dependencies = [
 [[package]]
 name = "libsql_replication"
 version = "0.0.2"
-source = "git+https://github.com/libsql/libsql#ea165beaaf9f8ef1cb13a288cb77e0fab54a242b"
+source = "git+https://github.com/libsql/libsql#417f64cd26b8696832af56ee6daa67140857cf1d"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -5835,7 +5835,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
  "cfg-if",
- "rand 0.8.5",
+ "rand 0.7.3",
  "static_assertions",
 ]
 
