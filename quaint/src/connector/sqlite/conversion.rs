@@ -243,11 +243,11 @@ impl<'a> ToColumnNames for SqliteRows {
     }
 }
 
-impl<'a> TryInto<LibsqlValue> for Value<'a> {
+impl<'a> TryFrom<&Value<'a>> for LibsqlValue {
     type Error = Error;
 
-    fn try_into(self) -> Result<LibsqlValue, Self::Error> {
-        let value = match self {
+    fn try_from(value: &Value<'a>) -> Result<LibsqlValue, Self::Error> {
+        let value = match value {
             Value::Int32(integer) => integer.map(LibsqlValue::from).map(Ok),
             // TODO(libsql): From implementation for i64
             Value::Int64(integer) => integer.map(LibsqlValue::Integer).map(Ok),
