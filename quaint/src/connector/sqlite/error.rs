@@ -125,7 +125,7 @@ impl From<libsql::Error> for Error {
                 builder.build()
             }
 
-            libsql::Error::LibError(extended_code, description) => match description {
+            libsql::Error::LibError(extended_code, ref description) => match description {
                 d if d.starts_with("no such table") => {
                     let table = d.split(": ").last().into();
                     let kind = ErrorKind::TableDoesNotExist { table };
@@ -157,14 +157,10 @@ impl From<libsql::Error> for Error {
                     builder.build()
                 }
                 _ => {
-                    let description = description.as_ref().map(|d| d.to_string());
+                    let description = description.clone();
                     let mut builder = Error::builder(ErrorKind::QueryError(e.into()));
                     builder.set_original_code(format!("{extended_code}"));
-
-                    if let Some(description) = description {
-                        builder.set_original_message(description);
-                    }
-
+                    builder.set_original_message(description);
                     builder.build()
                 }
             },
