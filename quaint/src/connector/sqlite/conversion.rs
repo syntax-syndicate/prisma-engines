@@ -281,18 +281,18 @@ impl<'a> TryFrom<&Value<'a>> for LibsqlValue {
             Value::Numeric(d) => d.as_ref().map(|d| {
                 // TODO(libsql): From implementation for f64
                 d.to_string().parse::<f64>().map(LibsqlValue::Real).map_err(|err| {
-                    Error::builder(ErrorKind::conversion("BigDecimal is not a f64."))
-                        .set_original_message(err.to_string())
-                        .build()
+                    let mut builder = Error::builder(ErrorKind::conversion("BigDecimal is not a f64."));
+                    builder.set_original_message(err.to_string());
+                    builder.build()
                 })
             }),
             #[cfg(feature = "json")]
             Value::Json(value) => value.as_ref().map(|value| {
                 // TODO(libsql): From implementation for String
                 serde_json::to_string(value).map(LibsqlValue::Text).map_err(|err| {
-                    Error::builder(ErrorKind::conversion("JSON serialization error"))
-                        .set_original_message(err.to_string())
-                        .build()
+                    let mut builder = Error::builder(ErrorKind::conversion("JSON serialization error"));
+                    builder.set_original_message(err.to_string());
+                    builder.build()
                 })
             }),
             // TODO(libsql): important: this clones the string, rusqlite retained a reference via ValueRef
