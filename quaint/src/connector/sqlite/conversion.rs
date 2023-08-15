@@ -248,23 +248,23 @@ impl<'a> TryInto<LibsqlValue> for Value<'a> {
 
     fn try_into(self) -> Result<LibsqlValue, Self::Error> {
         let value = match self {
-            Value::Int32(integer) => integer.map(LibsqlValue::from),
+            Value::Int32(integer) => integer.map(LibsqlValue::from).map(Ok),
             // TODO(libsql): From implementation for i64
-            Value::Int64(integer) => integer.map(LibsqlValue::Integer),
+            Value::Int64(integer) => integer.map(LibsqlValue::Integer).map(Ok),
             // TODO(libsql): From implementation for f32
-            Value::Float(float) => float.map(|f| f as f64).map(LibsqlValue::Real),
+            Value::Float(float) => float.map(|f| f as f64).map(LibsqlValue::Real).map(Ok),
             // TODO(libsql): From implementation for f64
-            Value::Double(double) => double.map(LibsqlValue::Real),
+            Value::Double(double) => double.map(LibsqlValue::Real).map(Ok),
             // TODO(libsql): important: this clones the string, rusqlite retained a reference via ValueRef
-            Value::Text(cow) => cow.as_ref().map(|cow| LibsqlValue::from(cow.as_ref())),
+            Value::Text(cow) => cow.as_ref().map(|cow| LibsqlValue::from(cow.as_ref())).map(Ok),
             // TODO(libsql): important: this clones the string, rusqlite retained a reference via ValueRef
-            Value::Enum(cow) => cow.as_ref().map(|cow| LibsqlValue::from(cow.as_ref())),
+            Value::Enum(cow) => cow.as_ref().map(|cow| LibsqlValue::from(cow.as_ref())).map(Ok),
             // TODO(libsql): From implementation for bool
-            Value::Boolean(boo) => boo.map(|b| LibsqlValue::Integer(b as i64)),
+            Value::Boolean(boo) => boo.map(|b| LibsqlValue::Integer(b as i64)).map(Ok),
             // TODO(libsql): From implementation for u8
-            Value::Char(c) => c.map(|c| LibsqlValue::Integer(c as u8)),
+            Value::Char(c) => c.map(|c| LibsqlValue::Integer(c as u8)).map(Ok),
             // TODO(libsql): important: this clones the bytes, rusqlite retained a reference via ValueRef
-            Value::Bytes(bytes) => bytes.as_ref().map(|bytes| LibsqlValue::from(bytes.to_vec())),
+            Value::Bytes(bytes) => bytes.as_ref().map(|bytes| LibsqlValue::from(bytes.to_vec())).map(Ok),
             Value::Array(_) => {
                 let msg = "Arrays are not supported in SQLite.";
                 let kind = ErrorKind::conversion(msg);
@@ -277,34 +277,39 @@ impl<'a> TryInto<LibsqlValue> for Value<'a> {
             #[cfg(feature = "bigdecimal")]
             Value::Numeric(d) => d.as_ref().map(|d| {
                 // TODO(libsql): From implementation for f64
-                LibsqlValue::Real(d.to_string().parse::<f64>().map_err(|err| {
+                d.to_string().parse::<f64>().map(LibsqlValue::Real).map_err(|err| {
                     Error::builder(ErrorKind::conversion("BigDecimal is not a f64."))
                         .set_original_message(err.to_string())
                         .build()
-                })?)
+                })
             }),
             #[cfg(feature = "json")]
             Value::Json(value) => value.as_ref().map(|value| {
                 // TODO(libsql): From implementation for String
-                LibsqlValue::Text(serde_json::to_string(value).map_err(|err| {
+                serde_json::to_string(value).map(LibsqlValue::Text).map_err(|err| {
                     Error::builder(ErrorKind::conversion("JSON serialization error"))
                         .set_original_message(err.to_string())
                         .build()
-                })?)
+                })
             }),
             // TODO(libsql): important: this clones the string, rusqlite retained a reference via ValueRef
-            Value::Xml(cow) => cow.as_ref().map(|cow| LibsqlValue::from(cow.as_ref())),
+            Value::Xml(cow) => cow.as_ref().map(|cow| LibsqlValue::from(cow.as_ref())).map(Ok),
             #[cfg(feature = "uuid")]
             // TODO(libsql): From implementation for String
-            Value::Uuid(value) => value.map(|value| LibsqlValue::Text(value.hyphenated().to_string())),
+            Value::Uuid(value) => value
+                .map(|value| LibsqlValue::Text(value.hyphenated().to_string()))
+                .map(Ok),
             #[cfg(feature = "chrono")]
             // TODO(libsql): From implementation for i64
-            Value::DateTime(value) => value.map(|value| LibsqlValue::Integer(value.timestamp_millis())),
+            Value::DateTime(value) => value
+                .map(|value| LibsqlValue::Integer(value.timestamp_millis()))
+                .map(Ok),
             #[cfg(feature = "chrono")]
             Value::Date(date) => date
                 .and_then(|date| date.and_hms_opt(0, 0, 0))
                 // TODO(libsql): From implementation for i64
-                .map(|dt| LibsqlValue::Integer(dt.timestamp_millis())),
+                .map(|dt| LibsqlValue::Integer(dt.timestamp_millis()))
+                .map(Ok),
             #[cfg(feature = "chrono")]
             Value::Time(time) => time
                 .and_then(|time| chrono::NaiveDate::from_ymd_opt(1970, 1, 1).map(|d| (d, time)))
@@ -313,11 +318,12 @@ impl<'a> TryInto<LibsqlValue> for Value<'a> {
                     date.and_hms_opt(time.hour(), time.minute(), time.second())
                 })
                 // TODO(libsql): From implementation for i64
-                .map(|dt| LibsqlValue::Integer(dt.timestamp_millis())),
+                .map(|dt| LibsqlValue::Integer(dt.timestamp_millis()))
+                .map(Ok),
         };
 
         match value {
-            Some(value) => Ok(value),
+            Some(value) => value,
             None => Ok(LibsqlValue::from(LibsqlValue::Null)),
         }
     }
