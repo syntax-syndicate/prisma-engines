@@ -23,7 +23,8 @@ pub use libsql;
 /// A connector interface for the SQLite database
 #[cfg_attr(feature = "docs", doc(cfg(feature = "sqlite")))]
 pub struct Sqlite {
-    db: libsql::Database,
+    // TODO: should they be behind the same mutex?
+    db: Mutex<libsql::Database>,
     pub(crate) client: Mutex<libsql::Connection>,
 }
 
@@ -143,7 +144,7 @@ impl TryFrom<&str> for Sqlite {
 
         let client = Mutex::new(conn);
 
-        Ok(Sqlite { db, client })
+        Ok(Sqlite { db: Mutex::new(db), client })
     }
 }
 
