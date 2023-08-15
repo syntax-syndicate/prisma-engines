@@ -145,7 +145,10 @@ impl TryFrom<&str> for Sqlite {
 
         let client = Mutex::new(conn);
 
-        Ok(Sqlite { _db: Mutex::new(db), client })
+        Ok(Sqlite {
+            _db: Mutex::new(db),
+            client,
+        })
     }
 }
 
