@@ -113,14 +113,12 @@ impl From<libsql::Error> for Error {
 
             // TODO(libsql): exposing both primary and extended_code and representing primary codes
             // as a Rust enum for easy matching.
-            libsql::Error::LibError(extended_code, description) if extended_code & 0xff == ffi::SQLITE_BUSY => {
+            libsql::Error::LibError(extended_code, description)
+                if (extended_code & 0xff) as u32 == ffi::SQLITE_BUSY =>
+            {
                 let mut builder = Error::builder(ErrorKind::SocketTimeout);
                 builder.set_original_code(format!("{extended_code}"));
-
-                if let Some(description) = description {
-                    builder.set_original_message(description);
-                }
-
+                builder.set_original_message(description);
                 builder.build()
             }
 
