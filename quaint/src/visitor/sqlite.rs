@@ -810,10 +810,12 @@ mod tests {
     }
 
     #[cfg(feature = "sqlite")]
-    fn sqlite_harness() -> ::rusqlite::Connection {
-        let conn = ::rusqlite::Connection::open_in_memory().unwrap();
+    fn sqlite_harness() -> libsql::Connection {
+        // TODO(libsql): open_in_memory
+        let conn = libsql::Database::open(":memory:").unwrap().connect().unwrap();
 
-        conn.execute("CREATE TABLE users (id, name TEXT, age REAL, nice INTEGER)", [])
+        // TODO(libsql): can't pass just `[]` as params
+        conn.execute("CREATE TABLE users (id, name TEXT, age REAL, nice INTEGER)", libsql::params![])
             .unwrap();
 
         let insert = Insert::single_into("users")
@@ -824,7 +826,8 @@ mod tests {
 
         let (sql, params) = Sqlite::build(insert).unwrap();
 
-        conn.execute(&sql, rusqlite::params_from_iter(params.iter())).unwrap();
+        // TODO(libsql): params_from_iter does not return a Result in rusqlite and evaluates lazily
+        conn.execute(&sql, libsql::params_from_iter(params.iter()).unwrap()).unwrap();
         conn
     }
 
@@ -844,9 +847,10 @@ mod tests {
             nice: i32,
         }
 
-        let mut stmt = conn.prepare(&sql_str).unwrap();
+        let stmt = conn.prepare(&sql_str).unwrap();
         let mut person_iter = stmt
-            .query_map(rusqlite::params_from_iter(params.iter()), |row| {
+            // TODO(libsql): owned Params are not accepted, had to convert to a reference
+            .query_map(&libsql::params_from_iter(params.iter()).unwrap(), |row| {
                 Ok(Person {
                     name: row.get(1).unwrap(),
                     age: row.get(2).unwrap(),
