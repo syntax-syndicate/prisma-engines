@@ -127,7 +127,7 @@ impl TypeIdentifier for Column<'_> {
     }
 }
 
-impl<'a> GetRow for LibsqlRow {
+impl GetRow for LibsqlRow {
     fn get_result_row(&self) -> crate::Result<Vec<Value<'static>>> {
         let statement = self.as_ref();
         let mut row = Vec::with_capacity(statement.columns().len());
@@ -240,7 +240,7 @@ impl<'a> GetRow for LibsqlRow {
     }
 }
 
-impl<'a> ToColumnNames for SqliteRows {
+impl ToColumnNames for SqliteRows {
     fn to_column_names(&self) -> Vec<String> {
         self.as_ref().column_names().into_iter().map(|c| c.into()).collect()
     }
@@ -327,7 +327,7 @@ impl<'a> TryFrom<&Value<'a>> for LibsqlValue {
 
         match value {
             Some(value) => value,
-            None => Ok(LibsqlValue::from(LibsqlValue::Null)),
+            None => Ok(LibsqlValue::Null),
         }
     }
 }
