@@ -290,11 +290,9 @@ impl<'a> TryInto<LibsqlValue> for Value<'a> {
             Value::Json(value) => value.as_ref().map(|value| {
                 // TODO(libsql): From implementation for String
                 LibsqlValue::Text(serde_json::to_string(value).map_err(|err| {
-                    Error::builder(
-                        ErrorKind::conversion("JSON serialization error")
-                            .set_original_message(err.to_string())
-                            .build(),
-                    )
+                    Error::builder(ErrorKind::conversion("JSON serialization error"))
+                        .set_original_message(err.to_string())
+                        .build()
                 })?)
             }),
             // TODO(libsql): important: this clones the string, rusqlite retained a reference via ValueRef
