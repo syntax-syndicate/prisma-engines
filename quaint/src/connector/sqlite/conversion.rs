@@ -239,10 +239,7 @@ impl<'a> GetRow for LibsqlRow {
 
 impl<'a> ToColumnNames for SqliteRows {
     fn to_column_names(&self) -> Vec<String> {
-        match self.as_ref() {
-            Some(statement) => statement.column_names().into_iter().map(|c| c.into()).collect(),
-            None => vec![],
-        }
+        self.as_ref().column_names().into_iter().map(|c| c.into()).collect()
     }
 }
 
