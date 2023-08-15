@@ -24,7 +24,7 @@ pub use libsql;
 #[cfg_attr(feature = "docs", doc(cfg(feature = "sqlite")))]
 pub struct Sqlite {
     // TODO: should they be behind the same mutex?
-    db: Mutex<libsql::Database>,
+    _db: Mutex<libsql::Database>,
     pub(crate) client: Mutex<libsql::Connection>,
 }
 
@@ -145,7 +145,7 @@ impl TryFrom<&str> for Sqlite {
 
         let client = Mutex::new(conn);
 
-        Ok(Sqlite { db: Mutex::new(db), client })
+        Ok(Sqlite { _db: Mutex::new(db), client })
     }
 }
 
@@ -182,9 +182,9 @@ impl Queryable for Sqlite {
             let client = self.client.lock().await;
 
             // TODO(libsql): important: prepare_cached
-            let mut stmt = client.prepare(sql)?;
+            let stmt = client.prepare(sql)?;
 
-            let mut rows = stmt.query(&params_from_iter(params.iter())?)?;
+            let rows = stmt.query(&params_from_iter(params.iter())?)?;
             let mut result = ResultSet::new(rows.to_column_names(), Vec::new());
 
             while let Some(row) = rows.next()? {
@@ -211,7 +211,7 @@ impl Queryable for Sqlite {
         metrics::query("sqlite.query_raw", sql, params, move || async move {
             let client = self.client.lock().await;
             // TODO(libsql): important: prepare_cached
-            let mut stmt = client.prepare(sql)?;
+            let stmt = client.prepare(sql)?;
             let res = stmt.execute(&params_from_iter(params.iter())?)?;
 
             Ok(res)
