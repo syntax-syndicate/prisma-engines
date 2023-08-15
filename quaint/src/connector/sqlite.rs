@@ -135,12 +135,13 @@ impl TryFrom<&str> for Sqlite {
         let params = SqliteParams::try_from(path)?;
         let file_path = params.file_path;
 
-        let db = libsql::Database::open(file_path);
+        let db = libsql::Database::open(file_path)?;
         let conn = db.connect()?;
 
-        if let Some(timeout) = params.socket_timeout {
-            conn.busy_timeout(timeout)?;
-        };
+        // TODO(libsql): important: busy_timeout is not available
+        // if let Some(timeout) = params.socket_timeout {
+        //     conn.busy_timeout(timeout)?;
+        // };
 
         let client = Mutex::new(conn);
 
@@ -183,7 +184,7 @@ impl Queryable for Sqlite {
             // TODO(libsql): important: prepare_cached
             let mut stmt = client.prepare(sql)?;
 
-            let mut rows = stmt.query(params_from_iter(params.iter()))?;
+            let mut rows = stmt.query(&params_from_iter(params.iter())?)?;
             let mut result = ResultSet::new(rows.to_column_names(), Vec::new());
 
             while let Some(row) = rows.next()? {
@@ -211,7 +212,7 @@ impl Queryable for Sqlite {
             let client = self.client.lock().await;
             // TODO(libsql): important: prepare_cached
             let mut stmt = client.prepare(sql)?;
-            let res = u64::try_from(stmt.execute(params_from_iter(params.iter()))?)?;
+            let res = stmt.execute(&params_from_iter(params.iter())?)?;
 
             Ok(res)
         })
