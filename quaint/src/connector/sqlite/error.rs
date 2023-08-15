@@ -26,7 +26,8 @@ impl From<libsql::Error> for Error {
                 builder.build()
             }
 
-            libsql::Error::ExecuteReturnedResults => {
+            // TODO(libsql): different name in rusqlite (`ExecuteReturnedResults`)
+            libsql::Error::ExecuteReturnedRows => {
                 let mut builder = Error::builder(ErrorKind::QueryError(e.into()));
                 builder.set_original_message("Execute returned results, which is not allowed in SQLite.");
 
