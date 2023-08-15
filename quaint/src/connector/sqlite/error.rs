@@ -16,15 +16,17 @@ impl From<libsql::Error> for Error {
                 }
             },
 
-            libsql::Error::InvalidQuery => {
-                let mut builder = Error::builder(ErrorKind::QueryError(e.into()));
+            // TODO(libsql): this does not exist
+            //
+            // libsql::Error::InvalidQuery => {
+            //     let mut builder = Error::builder(ErrorKind::QueryError(e.into()));
 
-                builder.set_original_message(
-                    "Could not interpret the query or its parameters. Check the syntax and parameter types.",
-                );
+            //     builder.set_original_message(
+            //         "Could not interpret the query or its parameters. Check the syntax and parameter types.",
+            //     );
 
-                builder.build()
-            }
+            //     builder.build()
+            // }
 
             // TODO(libsql): different name in rusqlite (`ExecuteReturnedResults`)
             libsql::Error::ExecuteReturnedRows => {
