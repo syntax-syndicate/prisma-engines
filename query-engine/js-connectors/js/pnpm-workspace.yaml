@@ -1,5 +1,6 @@
 packages:
   - './js-connector-utils'
+  - './pg-promise-connector'
   - './planetscale-js-connector'
   - './neon-js-connector'
   - './smoke-test-js'

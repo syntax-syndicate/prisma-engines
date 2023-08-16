@@ -1,5 +1,5 @@
 {
-  "name": "@tomhoule/pg-promise-connector",
+  "name": "@tomhoule/prisma-pg-promise-connector",
   "version": "0.0.1",
   "description": "Test convenience for the nodeAPI bridge with pg-promise",
   "main": "dist/index.js",
@@ -17,6 +17,6 @@
   ],
   "dependencies": {
     "@jkomyno/prisma-js-connector-utils": "workspace:*",
-    "pg-promise": "*"
+    "pg-promise": "^11"
   }
 }
