@@ -2144,7 +2144,7 @@ dependencies = [
 [[package]]
 name = "libsql"
 version = "0.1.6"
-source = "git+https://github.com/libsql/libsql?rev=417f64cd26b8696832af56ee6daa67140857cf1d#417f64cd26b8696832af56ee6daa67140857cf1d"
+source = "git+https://github.com/libsql/libsql?rev=ef470f4870d277aab1e6b2e867b36b9874466593#ef470f4870d277aab1e6b2e867b36b9874466593"
 dependencies = [
  "futures",
  "libsql-sys",
@@ -2159,7 +2159,7 @@ dependencies = [
 [[package]]
 name = "libsql-sys"
 version = "0.2.11"
-source = "git+https://github.com/libsql/libsql?rev=417f64cd26b8696832af56ee6daa67140857cf1d#417f64cd26b8696832af56ee6daa67140857cf1d"
+source = "git+https://github.com/libsql/libsql?rev=ef470f4870d277aab1e6b2e867b36b9874466593#ef470f4870d277aab1e6b2e867b36b9874466593"
 dependencies = [
  "bindgen 0.66.1",
  "cc",
@@ -2171,7 +2171,7 @@ dependencies = [
 [[package]]
 name = "libsql_replication"
 version = "0.0.2"
-source = "git+https://github.com/libsql/libsql?rev=417f64cd26b8696832af56ee6daa67140857cf1d#417f64cd26b8696832af56ee6daa67140857cf1d"
+source = "git+https://github.com/libsql/libsql?rev=ef470f4870d277aab1e6b2e867b36b9874466593#ef470f4870d277aab1e6b2e867b36b9874466593"
 dependencies = [
  "anyhow",
  "bytemuck",

@@ -117,7 +117,7 @@ branch = "vendored-openssl"
 [dependencies.libsql]
 version = "0.1"
 git = "https://github.com/libsql/libsql"
-rev = "417f64cd26b8696832af56ee6daa67140857cf1d"
+rev = "ef470f4870d277aab1e6b2e867b36b9874466593"
 optional = true
 
 [target.'cfg(not(any(target_os = "macos", target_os = "ios")))'.dependencies.tiberius]

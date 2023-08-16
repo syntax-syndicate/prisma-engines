@@ -125,7 +125,7 @@ impl From<libsql::Error> for Error {
                 builder.build()
             }
 
-            libsql::Error::LibError(extended_code, ref description) => match description {
+            libsql::Error::PrepareFailed(extended_code, _, ref description) => match description {
                 d if d.starts_with("no such table") => {
                     let table = d.split(": ").last().into();
                     let kind = ErrorKind::TableDoesNotExist { table };
