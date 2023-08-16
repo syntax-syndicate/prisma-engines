@@ -21,6 +21,7 @@
     "@jkomyno/prisma-js-connector-utils": "workspace:*",
     "@jkomyno/prisma-neon-js-connector": "workspace:*",
     "@jkomyno/prisma-planetscale-js-connector": "workspace:*",
+    "@tomhoule/prisma-pg-promise-connector": "workspace:*",
     "@prisma/client": "5.2.0-dev.30"
   },
   "devDependencies": {
