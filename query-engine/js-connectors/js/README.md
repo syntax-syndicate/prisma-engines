@@ -21,6 +21,12 @@ Install `pnpm` via:
 npm i -g pnpm
 ```
 
+or, for nix users:
+
+```sh
+nix develop nixpkgs#nodePackages.pnpm
+```
+
 ## Development
 
 - Install Node.js dependencies via `pnpm i`
