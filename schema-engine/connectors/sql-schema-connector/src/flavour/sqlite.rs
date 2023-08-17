@@ -182,7 +182,7 @@ impl SqlFlavour for SqliteFlavour {
             let rows = match conn.query_raw(SQL, &[]) {
                 Ok(result) => result,
                 Err(err) => {
-                    if let Some(libsql::Error::LibError(
+                    if let Some(libsql::Error::PrepareFailed(
                         // TODO: it is a generic error code, should we check the message here as well?
                         1, // table not found
                         ..,
