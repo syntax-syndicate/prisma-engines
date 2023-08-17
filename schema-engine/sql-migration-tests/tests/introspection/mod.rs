@@ -1,5 +1,5 @@
 use expect_test::expect;
-use quaint::connector::rusqlite;
+use quaint::connector::libsql;
 use schema_core::json_rpc::types::IntrospectParams;
 use test_setup::runtime::run_with_thread_local_runtime as tok;
 
@@ -10,7 +10,7 @@ fn introspect_force_with_invalid_schema() {
     let db_path = test_setup::sqlite_test_url("introspect_force_with_invalid_schema");
 
     {
-        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        let conn = libsql::Database::open(&db_path).unwrap().connect().unwrap();
         conn.execute_batch("CREATE TABLE corgis (bites BOOLEAN)").unwrap();
     }
 
@@ -65,7 +65,7 @@ fn introspect_no_force_with_invalid_schema() {
     let db_path = test_setup::sqlite_test_url("introspect_no_force_with_invalid_schema");
 
     {
-        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        let conn = libsql::Database::open(&db_path).unwrap().connect().unwrap();
         conn.execute_batch("CREATE TABLE corgis (bites BOOLEAN)").unwrap();
     }
 

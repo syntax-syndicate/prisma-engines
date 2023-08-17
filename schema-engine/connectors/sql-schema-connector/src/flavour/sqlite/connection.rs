@@ -1,6 +1,6 @@
 //! All the quaint-wrangling for the sqlite connector should happen here.
 
-pub(crate) use quaint::connector::rusqlite;
+pub(crate) use quaint::connector::libsql;
 
 use quaint::connector::{GetRow, ToColumnNames};
 use schema_connector::{ConnectorError, ConnectorResult};
@@ -8,17 +8,21 @@ use sql_schema_describer::{sqlite as describer, DescriberErrorKind, SqlSchema};
 use std::sync::Mutex;
 use user_facing_errors::schema_engine::ApplyMigrationError;
 
-pub(super) struct Connection(Mutex<rusqlite::Connection>);
+pub(super) struct Connection(Mutex<libsql::Connection>);
 
 impl Connection {
     pub(super) fn new(params: &super::Params) -> ConnectorResult<Self> {
         Ok(Connection(Mutex::new(
-            rusqlite::Connection::open(&params.file_path).map_err(convert_error)?,
+            libsql::Database::open(&params.file_path)
+                .and_then(|db| db.connect())
+                .map_err(convert_error)?,
         )))
     }
 
     pub(super) fn new_in_memory() -> Self {
-        Connection(Mutex::new(rusqlite::Connection::open_in_memory().unwrap()))
+        Connection(Mutex::new(
+            libsql::Database::open(":memory:").unwrap().connect().unwrap(),
+        ))
     }
 
     pub(super) async fn describe_schema(&mut self) -> ConnectorResult<SqlSchema> {
@@ -54,10 +58,11 @@ impl Connection {
     ) -> ConnectorResult<quaint::prelude::ResultSet> {
         tracing::debug!(query_type = "query_raw", sql);
         let conn = self.0.lock().unwrap();
-        let mut stmt = conn.prepare_cached(sql).map_err(convert_error)?;
+        // TODO(libsql): prepare_cached
+        let stmt = conn.prepare(sql).map_err(convert_error)?;
 
-        let mut rows = stmt
-            .query(rusqlite::params_from_iter(params.iter()))
+        let rows = stmt
+            .query(&libsql::params_from_iter(params.iter()).map_err(convert_error)?)
             .map_err(convert_error)?;
         let column_names = rows.to_column_names();
         let mut converted_rows = Vec::new();
@@ -76,13 +81,11 @@ pub(super) fn generic_apply_migration_script(
 ) -> ConnectorResult<()> {
     tracing::debug!(query_type = "raw_cmd", sql = script);
     let conn = conn.0.lock().unwrap();
-    conn.execute_batch(script).map_err(|sqlite_error: rusqlite::Error| {
+    conn.execute_batch(script).map_err(|sqlite_error: libsql::Error| {
         let database_error_code = match sqlite_error {
-            rusqlite::Error::SqliteFailure(rusqlite::ffi::Error { extended_code, .. }, _)
-            | rusqlite::Error::SqlInputError {
-                error: rusqlite::ffi::Error { extended_code, .. },
-                ..
-            } => extended_code.to_string(),
+            libsql::Error::LibError(extended_code, ..)
+            | libsql::Error::PrepareFailed(extended_code, ..)
+            | libsql::Error::FetchRowFailed(extended_code, ..) => extended_code.to_string(),
             _ => "none".to_owned(),
         };
 
@@ -94,6 +97,6 @@ pub(super) fn generic_apply_migration_script(
     })
 }
 
-fn convert_error(err: rusqlite::Error) -> ConnectorError {
+fn convert_error(err: libsql::Error) -> ConnectorError {
     ConnectorError::from_source(err, "SQLite database error")
 }

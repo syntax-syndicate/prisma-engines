@@ -25,15 +25,16 @@ pub trait Connection {
 }
 
 #[async_trait::async_trait]
-impl Connection for std::sync::Mutex<quaint::connector::rusqlite::Connection> {
+impl Connection for std::sync::Mutex<quaint::connector::libsql::Connection> {
     async fn query_raw<'a>(
         &'a self,
         sql: &'a str,
         params: &'a [quaint::prelude::Value<'a>],
     ) -> quaint::Result<quaint::prelude::ResultSet> {
         let conn = self.lock().unwrap();
-        let mut stmt = conn.prepare_cached(sql)?;
-        let mut rows = stmt.query(quaint::connector::rusqlite::params_from_iter(params.iter()))?;
+        // TODO(libsql): prepare_cached
+        let stmt = conn.prepare(sql)?;
+        let rows = stmt.query(&quaint::connector::libsql::params_from_iter(params.iter())?)?;
         let column_names = rows.to_column_names();
         let mut converted_rows = Vec::new();
         while let Some(row) = rows.next()? {

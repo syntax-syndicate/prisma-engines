@@ -182,13 +182,11 @@ impl SqlFlavour for SqliteFlavour {
             let rows = match conn.query_raw(SQL, &[]) {
                 Ok(result) => result,
                 Err(err) => {
-                    if let Some(rusqlite::Error::SqliteFailure(
-                        rusqlite::ffi::Error {
-                            extended_code: 1, // table not found
-                            ..
-                        },
-                        _,
-                    )) = err.source_as::<rusqlite::Error>()
+                    if let Some(libsql::Error::LibError(
+                        // TODO: it is a generic error code, should we check the message here as well?
+                        1, // table not found
+                        ..,
+                    )) = err.source_as::<libsql::Error>()
                     {
                         return Ok(Err(schema_connector::PersistenceNotInitializedError));
                     } else {
