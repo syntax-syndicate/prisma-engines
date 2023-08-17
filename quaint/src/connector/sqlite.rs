@@ -183,7 +183,7 @@ impl Sqlite {
         Self::new(":memory:")
     }
 
-    /// The underlying rusqlite::Connection. Only available with the `expose-drivers` Cargo
+    /// The underlying libsql::Connection. Only available with the `expose-drivers` Cargo
     /// feature. This is a lower level API when you need to get into database specific features.
     #[cfg(feature = "expose-drivers")]
     pub fn connection(&self) -> &Mutex<libsql::Connection> {
