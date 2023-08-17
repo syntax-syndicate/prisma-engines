@@ -116,8 +116,9 @@ branch = "vendored-openssl"
 
 [dependencies.libsql]
 version = "0.1"
-git = "https://github.com/libsql/libsql"
-rev = "fa76af21b90f1b40d542e67158289588500d2b00"
+git = "https://github.com/aqrln/libsql"
+rev = "77c8b71481ebac0dbfa928f5c108fcd00d64ed81"
+# path = "/home/aqrln/git/libsql/crates/core"
 optional = true
 
 [target.'cfg(not(any(target_os = "macos", target_os = "ios")))'.dependencies.tiberius]
