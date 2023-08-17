@@ -38,7 +38,7 @@ impl From<libsql::Error> for Error {
 
             libsql::Error::QueryReturnedNoRows => Error::builder(ErrorKind::NotFound).build(),
 
-            libsql::Error::LibError(2067, description) => {
+            libsql::Error::FetchRowFailed(2067, description) | libsql::Error::LibError(2067, description) => {
                 let constraint = description
                     .split(": ")
                     .nth(1)
@@ -56,7 +56,7 @@ impl From<libsql::Error> for Error {
                 builder.build()
             }
 
-            libsql::Error::LibError(1555, description) => {
+            libsql::Error::FetchRowFailed(1555, description) | libsql::Error::LibError(1555, description) => {
                 let constraint = description
                     .split(": ")
                     .nth(1)
@@ -74,7 +74,7 @@ impl From<libsql::Error> for Error {
                 builder.build()
             }
 
-            libsql::Error::LibError(1299, description) => {
+            libsql::Error::FetchRowFailed(1299, description) | libsql::Error::LibError(1299, description) => {
                 let constraint = description
                     .split(": ")
                     .nth(1)
@@ -92,7 +92,7 @@ impl From<libsql::Error> for Error {
                 builder.build()
             }
 
-            libsql::Error::LibError(787, description) => {
+            libsql::Error::FetchRowFailed(787, description) | libsql::Error::LibError(787, description) => {
                 let mut builder = Error::builder(ErrorKind::ForeignKeyConstraintViolation {
                     constraint: DatabaseConstraint::ForeignKey,
                 });
@@ -103,7 +103,7 @@ impl From<libsql::Error> for Error {
                 builder.build()
             }
 
-            libsql::Error::LibError(1811, description) => {
+            libsql::Error::FetchRowFailed(1811, description) | libsql::Error::LibError(1811, description) => {
                 let mut builder = Error::builder(ErrorKind::ForeignKeyConstraintViolation {
                     constraint: DatabaseConstraint::ForeignKey,
                 });
