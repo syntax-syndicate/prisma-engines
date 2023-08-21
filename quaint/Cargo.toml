@@ -116,8 +116,8 @@ branch = "vendored-openssl"
 
 [dependencies.libsql]
 version = "0.1"
-git = "https://github.com/aqrln/libsql"
-rev = "77c8b71481ebac0dbfa928f5c108fcd00d64ed81"
+git = "https://github.com/libsql/libsql"
+rev = "71d456c7cef9ff4c5caa9bce929d5d833d019c18"
 # path = "/home/aqrln/git/libsql/crates/core"
 optional = true
 
