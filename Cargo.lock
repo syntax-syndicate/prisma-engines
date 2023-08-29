@@ -1724,6 +1724,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hrana-client-proto"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f16b4e41e289da3fd60e64f245246a97e78fab7b3788c6d8147b3ae7d9f5e533"
+dependencies = [
+ "anyhow",
+ "base64 0.21.2",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "html-escape"
 version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1753,6 +1765,12 @@ dependencies = [
  "http",
  "pin-project-lite",
 ]
+
+[[package]]
+name = "http-range-header"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "add0ab9360ddbd88cfeb3bd9574a1d85cfdfa14db10b3e21d3700dbc4328758f"
 
 [[package]]
 name = "httparse"
@@ -2144,12 +2162,20 @@ dependencies = [
 [[package]]
 name = "libsql"
 version = "0.1.6"
-source = "git+https://github.com/libsql/libsql?rev=71d456c7cef9ff4c5caa9bce929d5d833d019c18#71d456c7cef9ff4c5caa9bce929d5d833d019c18"
+source = "git+https://github.com/libsql/libsql?rev=8ab3ee452efe138a7a1f6087de269cb960d21ac6#8ab3ee452efe138a7a1f6087de269cb960d21ac6"
 dependencies = [
+ "async-trait",
+ "base64 0.21.2",
+ "crossbeam-channel",
  "futures",
+ "hrana-client-proto",
+ "hyper",
+ "hyper-rustls",
  "libsql-sys",
  "libsql_replication",
  "parking_lot 0.12.1",
+ "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "tracing",
@@ -2159,7 +2185,7 @@ dependencies = [
 [[package]]
 name = "libsql-sys"
 version = "0.2.11"
-source = "git+https://github.com/libsql/libsql?rev=71d456c7cef9ff4c5caa9bce929d5d833d019c18#71d456c7cef9ff4c5caa9bce929d5d833d019c18"
+source = "git+https://github.com/libsql/libsql?rev=8ab3ee452efe138a7a1f6087de269cb960d21ac6#8ab3ee452efe138a7a1f6087de269cb960d21ac6"
 dependencies = [
  "bindgen 0.66.1",
  "cc",
@@ -2171,7 +2197,7 @@ dependencies = [
 [[package]]
 name = "libsql_replication"
 version = "0.0.2"
-source = "git+https://github.com/libsql/libsql?rev=71d456c7cef9ff4c5caa9bce929d5d833d019c18#71d456c7cef9ff4c5caa9bce929d5d833d019c18"
+source = "git+https://github.com/libsql/libsql?rev=8ab3ee452efe138a7a1f6087de269cb960d21ac6#8ab3ee452efe138a7a1f6087de269cb960d21ac6"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -2195,7 +2221,9 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic 0.9.2",
+ "tonic-web",
  "tower",
+ "tower-http",
  "tracing",
  "uuid",
 ]
@@ -5593,7 +5621,7 @@ dependencies = [
 [[package]]
 name = "tonic"
 version = "0.9.2"
-source = "git+https://github.com/hyperium/tonic#aff1daf65d9a0d55b92719318eba2b5a4769c4e1"
+source = "git+https://github.com/hyperium/tonic#02788da8e3acbf087945154cfee85c0fc0ebc0b8"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -5635,6 +5663,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "tonic-web"
+version = "0.9.2"
+source = "git+https://github.com/hyperium/tonic#02788da8e3acbf087945154cfee85c0fc0ebc0b8"
+dependencies = [
+ "base64 0.21.2",
+ "bytes",
+ "futures-core",
+ "http",
+ "http-body",
+ "hyper",
+ "pin-project",
+ "tokio-stream",
+ "tonic 0.9.2",
+ "tower-http",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+]
+
+[[package]]
 name = "tower"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5649,6 +5697,25 @@ dependencies = [
  "slab",
  "tokio",
  "tokio-util 0.7.8",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+]
+
+[[package]]
+name = "tower-http"
+version = "0.4.3"
+source = "git+https://github.com/tower-rs/tower-http?branch=lucio/grpc-defaults#d4d621f36e52bcd77ccb261c69df3456f4b54e66"
+dependencies = [
+ "bitflags 2.4.0",
+ "bytes",
+ "futures-core",
+ "futures-util",
+ "http",
+ "http-body",
+ "http-range-header",
+ "pin-project-lite",
+ "tower",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -6448,3 +6515,8 @@ name = "yansi"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09041cd90cf85f7f8b2df60c646f853b7f535ce68f85244eb6731cf89fa498ec"
+
+[[patch.unused]]
+name = "tonic-build"
+version = "0.9.2"
+source = "git+https://github.com/hyperium/tonic#02788da8e3acbf087945154cfee85c0fc0ebc0b8"
