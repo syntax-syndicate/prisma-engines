@@ -5,6 +5,7 @@ pub use psl_core::builtin_connectors;
 pub use psl_core::{
     datamodel_connector,
     deserialize_from_bytes,
+    deserialize_from_json,
     diagnostics::{self, Diagnostics},
     is_reserved_type_name,
     mcf::config_to_mcf_json_value as get_config,
@@ -13,6 +14,7 @@ pub use psl_core::{
     reformat,
     schema_ast,
     serialize_to_bytes,
+    serialize_to_json,
     set_config_dir,
     Configuration,
     ConnectorRegistry,

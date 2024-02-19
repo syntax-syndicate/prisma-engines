@@ -172,6 +172,8 @@ pub fn validate(file: SourceFile, connectors: ConnectorRegistry<'_>) -> Validate
 /// Given a textual `.prisma` file, it:
 /// - parses it
 /// - validates it
+/// - extracts the metadata needed by `query-engine-wasm`
+/// - serializes it into a binary format
 pub fn serialize_to_bytes(file: SourceFile, connectors: ConnectorRegistry<'_>) -> Result<Vec<u8>, String> {
     let mut validated_schema = validate(file, connectors);
 
@@ -184,12 +186,39 @@ pub fn serialize_to_bytes(file: SourceFile, connectors: ConnectorRegistry<'_>) -
     postcard::to_allocvec(&serde_schema).map_err(|e| format!("[serialize]: {}", e))
 }
 
+/// Given a textual `.prisma` file, it:
+/// - parses it
+/// - validates it
+/// - extracts the metadata needed by `query-engine-wasm`
+/// - serializes it into JSON
+pub fn serialize_to_json(file: SourceFile, connectors: ConnectorRegistry<'_>) -> Result<String, String> {
+    let mut validated_schema = validate(file, connectors);
+
+    if let Err(err) = validated_schema.diagnostics.to_result() {
+        return Err(err.to_pretty_string("schema.prisma", validated_schema.db.source()));
+    }
+
+    let serde_schema = SerdeValidatedSchema::from(validated_schema);
+
+    serde_json::to_string(&serde_schema).map_err(|e| format!("[serialize]: {}", e))
+}
+
 pub fn deserialize_from_bytes(
     schema_as_binary: &[u8],
     connectors: &ValidatedConnectorRegistry<'_>,
 ) -> Result<ValidatedSchemaForQE, String> {
     let serde_schema: SerdeValidatedSchema =
         postcard::from_bytes(schema_as_binary).map_err(|e| format!("[deserialize] {}", e))?;
+
+    Ok(serde_schema.into_schema_for_qe(connectors))
+}
+
+pub fn deserialize_from_json(
+    schema_as_json: &str,
+    connectors: &ValidatedConnectorRegistry<'_>,
+) -> Result<ValidatedSchemaForQE, String> {
+    let serde_schema: SerdeValidatedSchema =
+        serde_json::from_str(schema_as_json).map_err(|e| format!("[deserialize] {}", e))?;
 
     Ok(serde_schema.into_schema_for_qe(connectors))
 }

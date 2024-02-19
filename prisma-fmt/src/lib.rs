@@ -68,6 +68,13 @@ pub fn serialize_to_bytes(file: psl::SourceFile) -> Result<Vec<u8>, String> {
     psl::serialize_to_bytes(file, connectors)
 }
 
+/// Serialize a Prisma schema into JSON, with the hope that, combined with gzip, it results in
+/// a smaller file than the binary equivalent.
+pub fn serialize_to_json(file: psl::SourceFile) -> Result<String, String> {
+    let connectors = psl::builtin_connectors::BUILTIN_CONNECTORS;
+    psl::serialize_to_json(file, connectors)
+}
+
 pub fn lint(schema: String) -> String {
     lint::run(&schema)
 }

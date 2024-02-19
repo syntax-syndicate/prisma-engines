@@ -53,6 +53,12 @@ pub fn serialize_schema_to_bytes(schema: String) -> Result<Vec<u8>, JsError> {
 }
 
 #[wasm_bindgen]
+pub fn serialize_schema_to_json(schema: String) -> Result<String, JsError> {
+    register_panic_hook();
+    prisma_fmt::serialize_to_json(schema.into()).map_err(|e| JsError::new(&e))
+}
+
+#[wasm_bindgen]
 pub fn lint(input: String) -> String {
     register_panic_hook();
     prisma_fmt::lint(input)
