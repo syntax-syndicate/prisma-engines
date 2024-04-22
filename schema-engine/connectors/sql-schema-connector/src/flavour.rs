@@ -21,7 +21,7 @@ use psl::{PreviewFeature, ValidatedSchema};
 use quaint::prelude::{ConnectionInfo, Table};
 use schema_connector::{
     migrations_directory::MigrationDirectory, BoxFuture, ConnectorError, ConnectorParams, ConnectorResult,
-    IntrospectionContext, MigrationRecord, Namespaces, PersistenceNotInitializedError,
+    IntrospectedQuery, IntrospectionContext, MigrationRecord, Namespaces, PersistenceNotInitializedError,
 };
 use sql_schema_describer::SqlSchema;
 use std::fmt::Debug;
@@ -291,6 +291,8 @@ pub(crate) trait SqlFlavour:
     fn version(&mut self) -> BoxFuture<'_, ConnectorResult<Option<String>>>;
 
     fn search_path(&self) -> &str;
+
+    fn introspect_query(&self, sql: &str) -> BoxFuture<'_, ConnectorResult<IntrospectedQuery>>;
 }
 
 // Utility function shared by multiple flavours to compare shadow database and main connection.

@@ -237,6 +237,10 @@ impl SchemaConnector for SqlSchemaConnector {
         Box::pin(async move { self.flavour.raw_cmd(&script).await })
     }
 
+    fn introspect_query<'a>(&'a self, sql: &str) -> BoxFuture<'a, ConnectorResult<IntrospectedQuery>> {
+        self.flavour.introspect_query(sql)
+    }
+
     #[tracing::instrument(skip(self, from, to))]
     fn diff(&self, from: DatabaseSchema, to: DatabaseSchema) -> Migration {
         let previous = SqlDatabaseSchema::from_erased(from);

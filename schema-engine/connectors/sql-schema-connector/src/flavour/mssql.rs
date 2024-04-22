@@ -7,7 +7,8 @@ use connection_string::JdbcString;
 use indoc::formatdoc;
 use quaint::{connector::MssqlUrl, prelude::Table};
 use schema_connector::{
-    migrations_directory::MigrationDirectory, BoxFuture, ConnectorError, ConnectorParams, ConnectorResult, Namespaces,
+    migrations_directory::MigrationDirectory, BoxFuture, ConnectorError, ConnectorParams, ConnectorResult,
+    IntrospectedQuery, Namespaces,
 };
 use sql_schema_describer::SqlSchema;
 use std::{future, str::FromStr};
@@ -500,6 +501,10 @@ impl SqlFlavour for MssqlFlavour {
 
     fn search_path(&self) -> &str {
         self.schema_name()
+    }
+
+    fn introspect_query(&self, _sql: &str) -> BoxFuture<'_, ConnectorResult<IntrospectedQuery>> {
+        unimplemented!()
     }
 }
 

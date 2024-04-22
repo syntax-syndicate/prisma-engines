@@ -4,7 +4,8 @@ use self::connection::*;
 use crate::flavour::SqlFlavour;
 use indoc::indoc;
 use schema_connector::{
-    migrations_directory::MigrationDirectory, BoxFuture, ConnectorError, ConnectorParams, ConnectorResult, Namespaces,
+    migrations_directory::MigrationDirectory, BoxFuture, ConnectorError, ConnectorParams, ConnectorResult,
+    IntrospectedQuery, Namespaces,
 };
 use sql_schema_describer::SqlSchema;
 use std::path::Path;
@@ -364,6 +365,10 @@ impl SqlFlavour for SqliteFlavour {
 
     fn search_path(&self) -> &str {
         "main"
+    }
+
+    fn introspect_query(&self, _sql: &str) -> BoxFuture<'_, ConnectorResult<IntrospectedQuery>> {
+        unimplemented!()
     }
 }
 

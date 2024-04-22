@@ -4,9 +4,9 @@ use enumflags2::BitFlags;
 use psl::ValidatedSchema;
 
 use crate::{
-    migrations_directory::MigrationDirectory, BoxFuture, ConnectorHost, ConnectorParams, ConnectorResult,
-    DatabaseSchema, DestructiveChangeChecker, DestructiveChangeDiagnostics, DiffTarget, IntrospectionContext,
-    IntrospectionResult, Migration, MigrationPersistence, Namespaces,
+    migrations_directory::MigrationDirectory, query_introspection::IntrospectedQuery, BoxFuture, ConnectorHost,
+    ConnectorParams, ConnectorResult, DatabaseSchema, DestructiveChangeChecker, DestructiveChangeDiagnostics,
+    DiffTarget, IntrospectionContext, IntrospectionResult, Migration, MigrationPersistence, Namespaces,
 };
 
 /// The top-level trait for connectors. This is the abstraction the schema engine core relies on to
@@ -142,4 +142,7 @@ pub trait SchemaConnector: Send + Sync + 'static {
 
     /// Extract the namespaces from a Sql database schema (it will return None for mongodb).
     fn extract_namespaces(&self, schema: &DatabaseSchema) -> Option<Namespaces>;
+
+    /// Introspects sql query and returns descriptions of the parameters/outputs
+    fn introspect_query<'a>(&'a self, sql: &str) -> BoxFuture<'a, ConnectorResult<IntrospectedQuery>>;
 }

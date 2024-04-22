@@ -7,7 +7,8 @@ use enumflags2::BitFlags;
 use indoc::indoc;
 use quaint::{connector::PostgresUrl, Value};
 use schema_connector::{
-    migrations_directory::MigrationDirectory, BoxFuture, ConnectorError, ConnectorParams, ConnectorResult, Namespaces,
+    migrations_directory::MigrationDirectory, BoxFuture, ConnectorError, ConnectorParams, ConnectorResult,
+    IntrospectedQuery, Namespaces,
 };
 use sql_schema_describer::SqlSchema;
 use std::{borrow::Cow, collections::HashMap, future, time};
@@ -488,6 +489,10 @@ impl SqlFlavour for PostgresFlavour {
 
     fn search_path(&self) -> &str {
         self.schema_name()
+    }
+
+    fn introspect_query(&mut self, sql: &str) -> BoxFuture<'_, ConnectorResult<IntrospectedQuery>> {
+        with_connection(self, |_, _, connection| connection.introspect_query(sql))
     }
 }
 

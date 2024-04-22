@@ -7,7 +7,7 @@ use quaint::{
     connector::{self, tokio_postgres::error::ErrorPosition, PostgresUrl},
     prelude::{ConnectionInfo, NativeConnectionInfo, Queryable},
 };
-use schema_connector::{ConnectorError, ConnectorResult, Namespaces};
+use schema_connector::{ConnectorError, ConnectorResult, IntrospectedQuery, Namespaces};
 use sql_schema_describer::{postgres::PostgresSchemaExt, SqlSchema};
 use user_facing_errors::{schema_engine::ApplyMigrationError, schema_engine::DatabaseSchemaInconsistent};
 
@@ -218,6 +218,17 @@ impl Connection {
                 }))
             }
         }
+    }
+
+    pub(super) async fn introspect_query(&self, sql: &str) -> ConnectorResult<IntrospectedQuery> {
+        let client = self.0.client();
+        let statement = client.prepare(sql).await?;
+
+        Ok(IntrospectedQuery {
+            sql: sql.to_owned(),
+            arg_types: vec![],
+            result_types: vec![],
+        })
     }
 }
 

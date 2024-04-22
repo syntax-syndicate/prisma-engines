@@ -14,6 +14,7 @@ mod introspection_result;
 mod migration;
 mod migration_persistence;
 mod namespaces;
+mod query_introspection;
 mod schema_connector;
 
 pub mod migrations_directory;
@@ -33,6 +34,7 @@ pub use introspection_context::{CompositeTypeDepth, IntrospectionContext};
 pub use introspection_result::{IntrospectionResult, IntrospectionResultOutput, ViewDefinition};
 pub use migration::Migration;
 pub use migration_persistence::{MigrationPersistence, MigrationRecord, PersistenceNotInitializedError, Timestamp};
+pub use query_introspection::{IntrospectedQuery, Type};
 pub use warnings::Warnings;
 
 /// Alias for a pinned, boxed future, used by the traits.

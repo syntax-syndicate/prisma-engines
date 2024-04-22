@@ -10,7 +10,8 @@ use psl::{datamodel_connector, parser_database::ScalarType, ValidatedSchema};
 use quaint::connector::MysqlUrl;
 use regex::{Regex, RegexSet};
 use schema_connector::{
-    migrations_directory::MigrationDirectory, BoxFuture, ConnectorError, ConnectorParams, ConnectorResult, Namespaces,
+    migrations_directory::MigrationDirectory, BoxFuture, ConnectorError, ConnectorParams, ConnectorResult,
+    IntrospectedQuery, Namespaces,
 };
 use sql_schema_describer::SqlSchema;
 use std::future;
@@ -419,6 +420,10 @@ impl SqlFlavour for MysqlFlavour {
 
     fn search_path(&self) -> &str {
         self.database_name()
+    }
+
+    fn introspect_query(&self, _sql: &str) -> BoxFuture<'_, ConnectorResult<IntrospectedQuery>> {
+        unimplemented!()
     }
 }
 
